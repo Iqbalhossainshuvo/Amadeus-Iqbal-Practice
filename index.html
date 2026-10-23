@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}</style>
+</head>
+<body>
+<title>Amadeus Practice Terminal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Hind+Siliguri:wght@400;500;600&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+if (window.tailwind) {
+  tailwind.config = {
+    theme: { extend: {
+      fontFamily: {
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'Menlo', 'Consolas', 'monospace'],
+        sans: ['"IBM Plex Sans"', '"Hind Siliguri"', 'system-ui', 'sans-serif'],
+        bn: ['"Hind Siliguri"', '"IBM Plex Sans"', 'system-ui', 'sans-serif']
+      }
+    } }
+  };
+}
+</script>
+<style>
+/* Layout: navy system bar on top, white cryptic "command page" sheet on the left, training rail on the right. Single deliberate light theme like a GDS terminal. */
+:root{
+  --nav:#0B1D3F; --nav2:#163463; --navline:#2A4B80;
+  --page:#E6ECF4; --sheet:#FFFFFF; --sheet2:#F4F7FB; --ink:#132036; --muted:#5A6A84; --line:#CFD9E6;
+  --entry:#1A4FBF; --err:#B3261E; --errbg:#FCEDEB; --hint:#7A4A00; --hintbg:#FFF5D9; --hintline:#EBCB7A;
+  --ok:#146B3A; --okbg:#E5F3EA; --accent:#F2A516;
+  --fs:13.5px;
+  color-scheme: light;
+}
+[hidden]{display:none!important}
+html,body{background:var(--page);color:var(--ink)}
+body{font-family:"IBM Plex Sans","Hind Siliguri",system-ui,sans-serif;font-size:14px}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bn{font-family:"Hind Siliguri","IBM Plex Sans",system-ui,sans-serif}
+.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+@media (min-width:1024px){ html,body{height:100%} #app{height:100%} }
+#term{height:78svh;min-height:420px}
+@media (min-width:1024px){ #term{height:auto;min-height:0} }
+#screen{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:var(--fs);line-height:1.45;background:var(--sheet);color:var(--ink)}
+#screen pre{margin:0;white-space:pre;font:inherit}
+.blk{padding:6px 14px 8px;border-bottom:1px dashed #E3E9F1}
+.cmdline{color:var(--entry);font-weight:600;white-space:pre}
+.resp{color:var(--ink)}
+.resp.err{color:var(--err);font-weight:600}
+.resp.okm{color:var(--ok);font-weight:600}
+.hintcard{margin-top:6px;background:var(--hintbg);border:1px solid var(--hintline);border-radius:4px;padding:8px 10px;color:var(--hint);font-family:"Hind Siliguri","IBM Plex Sans",sans-serif;font-size:14px;line-height:1.5;white-space:normal;max-width:72ch}
+.hintcard.info{background:#EAF1FD;border-color:#B9CDF2;color:#163E8C}
+.hintcard b{font-weight:600}
+.ex{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:#fff;border:1px solid var(--hintline);color:var(--entry);padding:1px 7px;border-radius:3px;margin:2px 4px 2px 0;cursor:pointer;display:inline-block}
+.hintcard.info .ex{border-color:#B9CDF2}
+.ex:hover{background:var(--entry);color:#fff}
+.ex:focus-visible,.chip:focus-visible,.tabbtn:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#cmd{font-family:"IBM Plex Mono",monospace;font-size:calc(var(--fs) + 1px);color:var(--entry);background:transparent;caret-color:var(--entry);text-transform:uppercase}
+#cmd:focus{outline:none}
+#cmd::placeholder{text-transform:none;color:#8A99B2;font-family:"Hind Siliguri","IBM Plex Sans",sans-serif;font-size:13.5px}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:12px;border:1px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:3px;padding:3px 8px;white-space:nowrap;cursor:pointer}
+.chip:hover{border-color:var(--entry);color:var(--entry)}
+.tabbtn{font-size:13px;padding:8px 12px;border-bottom:2px solid transparent;color:var(--muted);white-space:nowrap}
+.tabbtn[aria-selected="true"]{color:var(--ink);border-color:var(--entry);font-weight:600}
+.stat{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.04em;border:1px solid var(--navline);color:#C9D6EE;padding:2px 8px;border-radius:3px;white-space:nowrap}
+.stat b{color:#fff;font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:6px;background:#E05A4F;vertical-align:middle}
+.dot.on{background:#3FC27A}
+.lesson summary{cursor:pointer;list-style:none}
+.lesson summary::-webkit-details-marker{display:none}
+.step{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;align-items:start;padding:6px 0;border-top:1px solid #EDF1F6}
+.tick{width:16px;height:16px;border-radius:3px;border:1.5px solid #9FB0C8;margin-top:2px;display:grid;place-items:center;font-size:11px;color:#fff}
+.tick.done{background:var(--ok);border-color:var(--ok)}
+.coach{font-family:"Hind Siliguri","IBM Plex Sans",sans-serif}
+.pnrbox{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.45;white-space:pre;overflow-x:auto;background:var(--sheet);border:1px solid var(--line);padding:10px;border-radius:4px;color:var(--ink)}
+.kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 5px;background:var(--sheet)}
+::selection{background:#CFE0FF}
+@media (prefers-reduced-motion:no-preference){ .blk.new{animation:fadein .18s ease-out} @keyframes fadein{from{background:#F2F7FF}to{background:transparent}} }
+</style>
+
+<div id="app" class="flex flex-col">
+  <!-- System bar -->
+  <header style="background:var(--nav);color:#fff">
+    <div class="gut flex flex-wrap items-center gap-x-4 gap-y-2" style="padding-block:10px">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="mono grid place-items-center font-semibold" style="width:34px;height:34px;border:1.5px solid var(--accent);color:var(--accent);border-radius:4px;font-size:13px">GDS</div>
+        <div class="min-w-0">
+          <div class="font-semibold" style="font-size:15px;letter-spacing:.01em">Amadeus Practice Terminal</div>
+          <div class="bn" style="font-size:12px;color:#A9BBDA">ক্রিপটিক কমান্ড প্র্যাকটিস · ট্রেনিং মোড (অনানুষ্ঠানিক)</div>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 lg:ml-auto">
+        <span class="stat">OFFICE <b id="sOffice">DMMKS2100</b></span>
+        <span class="stat"><span id="sDot" class="dot"></span>SINE <b id="sSine">--/--</b></span>
+        <span class="stat">AREA <b>A</b></span>
+        <span class="stat">PNR <b id="sPnr">NONE</b></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 min-h-0 grid lg:grid-cols-[minmax(0,1fr)_400px]">
+    <!-- Command page -->
+    <section id="term" class="flex flex-col min-h-0 min-w-0 lg:border-r" style="border-color:var(--line)">
+      <div class="flex items-end justify-between gap-2" style="background:var(--sheet2);border-bottom:1px solid var(--line);padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:12px">
+        <div class="flex items-end gap-1 min-w-0 overflow-x-auto">
+          <div class="mono" style="font-size:12px;padding:7px 12px;background:var(--sheet);border:1px solid var(--line);border-bottom-color:var(--sheet);margin-bottom:-1px;border-radius:4px 4px 0 0;color:var(--ink);font-weight:600">Command Page</div>
+          <div class="mono hidden sm:block" style="font-size:12px;padding:7px 10px;color:var(--muted)">Cryptic · 1A format</div>
+        </div>
+        <div class="flex items-center gap-1 py-1">
+          <button id="fsDown" class="chip" title="ফন্ট ছোট" aria-label="ফন্ট ছোট">A−</button>
+          <button id="fsUp" class="chip" title="ফন্ট বড়" aria-label="ফন্ট বড়">A+</button>
+          <button id="clrBtn" class="chip" title="স্ক্রিন পরিষ্কার">CLEAR</button>
+        </div>
+      </div>
+      <div id="screen" class="flex-1 min-h-0 overflow-auto" aria-live="polite"></div>
+      <div id="coach" class="coach gut flex flex-wrap items-center gap-x-2 gap-y-1" style="background:#F0F5FD;border-top:1px solid var(--line);padding-block:7px;font-size:13.5px;color:#1C3870"></div>
+      <form id="cmdform" class="flex items-center gap-2" style="background:var(--sheet);border-top:2px solid var(--entry);padding:9px max(14px,env(safe-area-inset-right,0px)) 9px max(14px,env(safe-area-inset-left,0px))" autocomplete="off">
+        <span class="mono font-semibold" style="color:var(--entry);font-size:16px">&gt;</span>
+        <input id="cmd" class="flex-1 min-w-0" type="text" spellcheck="false" autocapitalize="characters" autocorrect="off" autocomplete="off" aria-label="Amadeus কমান্ড লিখুন" placeholder="কমান্ড লিখে Enter চাপুন (যেমন JI1234AB/SU)">
+        <button type="submit" class="mono" style="background:var(--entry);color:#fff;border-radius:3px;padding:5px 12px;font-size:12.5px;font-weight:600">SEND</button>
+      </form>
+      <div class="gut flex gap-1.5 overflow-x-auto" style="background:var(--sheet2);border-top:1px solid var(--line);padding-block:7px" id="chips"></div>
+      <div class="gut bn hidden md:flex flex-wrap gap-x-4 gap-y-1" style="font-size:12px;color:var(--muted);background:var(--sheet2);padding-block:0 8px">
+        <span><span class="kbd">Enter</span> পাঠান</span><span><span class="kbd">↑</span> <span class="kbd">↓</span> আগের কমান্ড</span><span><span class="kbd">Esc</span> লাইন মুছুন</span><span>সাজেশনের কমান্ডে ক্লিক করলে ইনপুটে বসে যাবে</span>
+      </div>
+    </section>
+
+    <!-- Training rail -->
+    <aside class="flex flex-col min-h-0 min-w-0" style="background:var(--sheet2)">
+      <div class="flex overflow-x-auto" role="tablist" style="border-bottom:1px solid var(--line);background:var(--sheet)">
+        <button class="tabbtn bn" role="tab" data-tab="guide" aria-selected="true">গাইড ও লেসন</button>
+        <button class="tabbtn bn" role="tab" data-tab="cmds" aria-selected="false">কমান্ড তালিকা</button>
+        <button class="tabbtn bn" role="tab" data-tab="pnr" aria-selected="false">PNR</button>
+        <button class="tabbtn bn" role="tab" data-tab="err" aria-selected="false">ভুলের খাতা <span id="errCount" class="mono" style="font-size:11px"></span></button>
+      </div>
+      <div class="flex-1 min-h-0 overflow-auto" style="padding:14px max(16px,env(safe-area-inset-right,0px)) 18px 16px">
+        <div data-panel="guide" class="bn flex flex-col gap-3">
+          <p style="font-size:13.5px;color:var(--muted);line-height:1.6">আসল Amadeus-এর মতো এখানে সব কাজ ক্রিপটিক কমান্ড দিয়ে করতে হয়। ভুল কমান্ড দিলে হলুদ বক্সে কারণ আর সঠিক ফরম্যাট দেখাবে। নিচের লেসনগুলো ধাপে ধাপে করুন, সম্পন্ন ধাপ নিজে থেকেই টিক হবে।</p>
+          <div id="lessons" class="flex flex-col gap-2"></div>
+          <div class="flex items-center gap-2"><button id="resetLessons" class="chip bn">লেসন প্রোগ্রেস রিসেট</button><button id="resetAll" class="chip bn" style="color:var(--err)">সব ডেটা মুছুন</button></div>
+          <div id="resetConfirm" hidden class="hintcard" style="max-width:none">সব PNR, টিকেট, হিস্ট্রি আর প্রোগ্রেস মুছে যাবে। নিশ্চিত? <button id="resetYes" class="ex" style="color:var(--err)">হ্যাঁ, মুছুন</button><button id="resetNo" class="ex">না</button></div>
+        </div>
+        <div data-panel="cmds" hidden class="flex flex-col gap-3">
+          <input id="cmdSearch" type="search" class="bn" placeholder="খুঁজুন: AN, নাম, টিকেট, SSR…" style="border:1px solid var(--line);background:var(--sheet);border-radius:4px;padding:7px 10px;font-size:13.5px;color:var(--ink)">
+          <div id="cmdList" class="flex flex-col gap-3"></div>
+        </div>
+        <div data-panel="pnr" hidden class="flex flex-col gap-3">
+          <div class="bn" style="font-size:13px;color:var(--muted)">বর্তমান PNR (আসল স্ক্রিনের মতো লাইভ)</div>
+          <div id="pnrLive" class="pnrbox"></div>
+          <div class="bn font-semibold" style="font-size:13.5px">সেভ করা PNR</div>
+          <div id="pnrSaved" class="flex flex-col gap-1.5"></div>
+        </div>
+        <div data-panel="err" hidden class="bn flex flex-col gap-3">
+          <p style="font-size:13.5px;color:var(--muted);line-height:1.6">যে কমান্ডগুলো ভুল হয়েছে আর সেগুলোর সঠিক রূপ। বারবার একই ভুল হলে সেটা আলাদা করে প্র্যাকটিস করুন।</p>
+          <div id="errList" class="flex flex-col gap-2"></div>
+        </div>
+      </div>
+      <div class="bn gut" style="font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);padding-block:8px">শুধু প্র্যাকটিসের জন্য। ফ্লাইট, ভাড়া ও সিট কাল্পনিক; Amadeus IT Group-এর সাথে কোনো সম্পর্ক নেই।</div>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =================== DATA =================== */
+// code: [city, airport, country, tz, lat, lon]
+const AP={
+ DAC:['DHAKA','HAZRAT SHAHJALAL INTL','BD',6,23.84,90.40], CGP:['CHATTOGRAM','SHAH AMANAT INTL','BD',6,22.25,91.81],
+ ZYL:['SYLHET','OSMANI INTL','BD',6,24.96,91.87], CXB:['COXS BAZAR','COXS BAZAR','BD',6,21.45,91.96],
+ DXB:['DUBAI','DUBAI INTL','AE',4,25.25,55.36], AUH:['ABU DHABI','ZAYED INTL','AE',4,24.43,54.65], SHJ:['SHARJAH','SHARJAH INTL','AE',4,25.33,55.52],
+ DOH:['DOHA','HAMAD INTL','QA',3,25.27,51.61], RUH:['RIYADH','KING KHALID INTL','SA',3,24.96,46.70], JED:['JEDDAH','KING ABDULAZIZ INTL','SA',3,21.68,39.16],
+ DMM:['DAMMAM','KING FAHD INTL','SA',3,26.47,49.80], MED:['MADINAH','PRINCE MOHAMMAD BIN ABDULAZIZ','SA',3,24.55,39.70],
+ KWI:['KUWAIT','KUWAIT INTL','KW',3,29.24,47.97], BAH:['BAHRAIN','BAHRAIN INTL','BH',3,26.27,50.63], MCT:['MUSCAT','MUSCAT INTL','OM',4,23.59,58.28],
+ IST:['ISTANBUL','ISTANBUL AIRPORT','TR',3,41.26,28.74], LHR:['LONDON','HEATHROW','GB',0,51.47,-0.45], LGW:['LONDON','GATWICK','GB',0,51.15,-0.18],
+ MAN:['MANCHESTER','MANCHESTER','GB',0,53.35,-2.27], CDG:['PARIS','CHARLES DE GAULLE','FR',1,49.01,2.55], FRA:['FRANKFURT','FRANKFURT INTL','DE',1,50.03,8.57],
+ AMS:['AMSTERDAM','SCHIPHOL','NL',1,52.31,4.76], FCO:['ROME','FIUMICINO','IT',1,41.80,12.25], MAD:['MADRID','BARAJAS','ES',1,40.47,-3.56],
+ ZRH:['ZURICH','ZURICH','CH',1,47.46,8.55], ATH:['ATHENS','ATHENS INTL','GR',2,37.94,23.94],
+ JFK:['NEW YORK','JOHN F KENNEDY INTL','US',-5,40.64,-73.78], IAD:['WASHINGTON','DULLES INTL','US',-5,38.95,-77.46],
+ ORD:['CHICAGO','OHARE INTL','US',-6,41.97,-87.91], LAX:['LOS ANGELES','LOS ANGELES INTL','US',-8,33.94,-118.41], YYZ:['TORONTO','PEARSON INTL','CA',-5,43.68,-79.63],
+ SIN:['SINGAPORE','CHANGI','SG',8,1.36,103.99], KUL:['KUALA LUMPUR','KUALA LUMPUR INTL','MY',8,2.75,101.71], BKK:['BANGKOK','SUVARNABHUMI','TH',7,13.69,100.75],
+ HKG:['HONG KONG','HONG KONG INTL','HK',8,22.31,113.91], CAN:['GUANGZHOU','BAIYUN INTL','CN',8,23.39,113.30], PEK:['BEIJING','CAPITAL INTL','CN',8,40.08,116.58],
+ NRT:['TOKYO','NARITA INTL','JP',9,35.77,140.39], ICN:['SEOUL','INCHEON INTL','KR',9,37.46,126.44],
+ DEL:['DELHI','INDIRA GANDHI INTL','IN',5.5,28.56,77.10], BOM:['MUMBAI','CHHATRAPATI SHIVAJI INTL','IN',5.5,19.09,72.87], CCU:['KOLKATA','NETAJI SUBHAS CHANDRA BOSE','IN',5.5,22.65,88.45],
+ KTM:['KATHMANDU','TRIBHUVAN INTL','NP',5.75,27.70,85.36], CMB:['COLOMBO','BANDARANAIKE INTL','LK',5.5,7.18,79.88], MLE:['MALE','VELANA INTL','MV',5,4.19,73.53],
+ KHI:['KARACHI','JINNAH INTL','PK',5,24.91,67.16], LHE:['LAHORE','ALLAMA IQBAL INTL','PK',5,31.52,74.40], ISB:['ISLAMABAD','ISLAMABAD INTL','PK',5,33.55,72.83],
+ CAI:['CAIRO','CAIRO INTL','EG',2,30.12,31.41], ADD:['ADDIS ABABA','BOLE INTL','ET',3,8.98,38.80], NBO:['NAIROBI','JOMO KENYATTA INTL','KE',3,-1.32,36.93],
+ JNB:['JOHANNESBURG','O R TAMBO INTL','ZA',2,-26.14,28.25], SYD:['SYDNEY','KINGSFORD SMITH','AU',11,-33.95,151.18], MEL:['MELBOURNE','TULLAMARINE','AU',11,-37.67,144.84],
+ MNL:['MANILA','NINOY AQUINO INTL','PH',8,14.51,121.02], CGK:['JAKARTA','SOEKARNO HATTA INTL','ID',7,-6.13,106.66]
+};
+const CTRY={BD:'BANGLADESH',AE:'UNITED ARAB EMIRATES',QA:'QATAR',SA:'SAUDI ARABIA',KW:'KUWAIT',BH:'BAHRAIN',OM:'OMAN',TR:'TURKIYE',GB:'UNITED KINGDOM',FR:'FRANCE',DE:'GERMANY',NL:'NETHERLANDS',IT:'ITALY',ES:'SPAIN',CH:'SWITZERLAND',GR:'GREECE',US:'UNITED STATES',CA:'CANADA',SG:'SINGAPORE',MY:'MALAYSIA',TH:'THAILAND',HK:'HONG KONG SAR',CN:'CHINA',JP:'JAPAN',KR:'KOREA REPUBLIC',IN:'INDIA',NP:'NEPAL',LK:'SRI LANKA',MV:'MALDIVES',PK:'PAKISTAN',EG:'EGYPT',ET:'ETHIOPIA',KE:'KENYA',ZA:'SOUTH AFRICA',AU:'AUSTRALIA',PH:'PHILIPPINES',ID:'INDONESIA'};
+// code: [name, ticket prefix, hubs, home country]
+const AL={
+ EK:['EMIRATES','176',['DXB'],'AE'], QR:['QATAR AIRWAYS','157',['DOH'],'QA'], SV:['SAUDIA','065',['JED','RUH'],'SA'],
+ BG:['BIMAN BANGLADESH AIRLINES','997',['DAC'],'BD'], BS:['US-BANGLA AIRLINES','779',['DAC'],'BD'], EY:['ETIHAD AIRWAYS','607',['AUH'],'AE'],
+ TK:['TURKISH AIRLINES','235',['IST'],'TR'], GF:['GULF AIR','072',['BAH'],'BH'], WY:['OMAN AIR','910',['MCT'],'OM'],
+ FZ:['FLYDUBAI','141',['DXB'],'AE'], G9:['AIR ARABIA','514',['SHJ'],'AE'], KU:['KUWAIT AIRWAYS','229',['KWI'],'KW'],
+ SQ:['SINGAPORE AIRLINES','618',['SIN'],'SG'], MH:['MALAYSIA AIRLINES','232',['KUL'],'MY'], TG:['THAI AIRWAYS','217',['BKK'],'TH'],
+ CX:['CATHAY PACIFIC','160',['HKG'],'HK'], AI:['AIR INDIA','098',['DEL','BOM'],'IN'], UL:['SRILANKAN AIRLINES','603',['CMB'],'LK'],
+ PK:['PAKISTAN INTL AIRLINES','214',['KHI','LHE','ISB'],'PK'], BA:['BRITISH AIRWAYS','125',['LHR'],'GB'], LH:['LUFTHANSA','220',['FRA'],'DE'],
+ AF:['AIR FRANCE','057',['CDG'],'FR'], KL:['KLM ROYAL DUTCH AIRLINES','074',['AMS'],'NL'], MS:['EGYPTAIR','077',['CAI'],'EG'],
+ ET:['ETHIOPIAN AIRLINES','071',['ADD'],'ET'], CZ:['CHINA SOUTHERN AIRLINES','784',['CAN'],'CN'], KE:['KOREAN AIR','180',['ICN'],'KR'],
+ NH:['ALL NIPPON AIRWAYS','205',['NRT'],'JP'], QF:['QANTAS','081',['SYD'],'AU'], AA:['AMERICAN AIRLINES','001',['JFK','ORD'],'US'],
+ UA:['UNITED AIRLINES','016',['ORD','IAD'],'US'], AC:['AIR CANADA','014',['YYZ'],'CA']
+};
+const LCC=new Set(['FZ','G9']);
+const EQ={'320':'AIRBUS A320','321':'AIRBUS A321','32N':'AIRBUS A320NEO','332':'AIRBUS A330-200','333':'AIRBUS A330-300','359':'AIRBUS A350-900','388':'AIRBUS A380-800','738':'BOEING 737-800','7M8':'BOEING 737 MAX 8','77W':'BOEING 777-300ER','773':'BOEING 777-300','788':'BOEING 787-8','789':'BOEING 787-9','AT7':'ATR 72-600'};
+const CUR={BD:['BDT',122,0],SA:['SAR',3.75,2],AE:['AED',3.6725,2],QA:['QAR',3.64,2],KW:['KWD',0.307,3],BH:['BHD',0.376,3],OM:['OMR',0.385,3],IN:['INR',84,0],PK:['PKR',280,0],GB:['GBP',0.79,2],FR:['EUR',0.92,2],DE:['EUR',0.92,2],NL:['EUR',0.92,2],IT:['EUR',0.92,2],ES:['EUR',0.92,2],GR:['EUR',0.92,2],CH:['CHF',0.88,2],CA:['CAD',1.37,2],SG:['SGD',1.34,2],MY:['MYR',4.45,2],TH:['THB',34,0],HK:['HKD',7.8,2],CN:['CNY',7.2,2],JP:['JPY',150,0],KR:['KRW',1380,0],AU:['AUD',1.52,2],NP:['NPR',134,0],LK:['LKR',300,0]};
+const BIZ=['J','C','D','I','Z'], ECO=['Y','B','M','H','K','L','Q','T','V','X'];
+const MULT={J:3.4,C:3.0,D:2.6,I:2.2,Z:1.9,Y:1.7,B:1.45,M:1.3,H:1.17,K:1.05,L:0.95,Q:0.86,T:0.78,V:0.7,X:0.62};
+const SSRC={VGML:'VEGETARIAN VEGAN MEAL',AVML:'ASIAN VEGETARIAN MEAL',MOML:'MUSLIM MEAL',HNML:'HINDU MEAL',KSML:'KOSHER MEAL',DBML:'DIABETIC MEAL',CHML:'CHILD MEAL',BBML:'BABY MEAL',SFML:'SEAFOOD MEAL',GFML:'GLUTEN FREE MEAL',LCML:'LOW CALORIE MEAL',WCHR:'WHEELCHAIR - CAN CLIMB STAIRS',WCHS:'WHEELCHAIR - CANNOT CLIMB STAIRS',WCHC:'WHEELCHAIR - IMMOBILE',BLND:'BLIND PASSENGER',DEAF:'DEAF PASSENGER',UMNR:'UNACCOMPANIED MINOR',PETC:'PET IN CABIN',BSCT:'BASSINET',MEDA:'MEDICAL CASE',FQTV:'FREQUENT FLYER NUMBER',CTCE:'PASSENGER EMAIL CONTACT',CTCM:'PASSENGER MOBILE CONTACT',XBAG:'EXCESS BAGGAGE',DOCS:'PASSPORT INFORMATION'};
+const SSR_TEXT=new Set(['FQTV','CTCE','CTCM','XBAG','UMNR','MEDA']);
+const TITLES=['MR','MRS','MS','MISS','MSTR','DR','INF','CHD'];
+const OFFICE='DMMKS2100';
+const MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const DOW2=['SU','MO','TU','WE','TH','FR','SA'];
+
+/* =================== UTILS =================== */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+function iso(y,m,d){return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+function today(){const d=new Date();return iso(d.getFullYear(),d.getMonth(),d.getDate());}
+function pIso(s){const[y,m,d]=s.split('-').map(Number);return new Date(Date.UTC(y,m-1,d));}
+function addDays(s,n){const d=pIso(s);d.setUTCDate(d.getUTCDate()+n);return iso(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());}
+function ddmmm(s){const d=pIso(s);return String(d.getUTCDate()).padStart(2,'0')+MON[d.getUTCMonth()];}
+function ddmmmyy(s){return ddmmm(s)+s.slice(2,4);}
+function dowNum(s){const g=pIso(s).getUTCDay();return g===0?7:g;}
+function dow2(s){return DOW2[pIso(s).getUTCDay()];}
+function dayDiff(a,b){return Math.round((pIso(b)-pIso(a))/864e5);}
+function parseDate(str){
+  const m=/^(\d{1,2})([A-Z]{3})(\d{2})?$/.exec(str); if(!m) return null;
+  const d=+m[1], mo=MON.indexOf(m[2]); if(mo<0||d<1||d>31) return null;
+  const t=today(); let y;
+  if(m[3]) y=2000+(+m[3]); else { y=+t.slice(0,4); if(iso(y,mo,d)<t) y++; }
+  const dt=new Date(Date.UTC(y,mo,d)); if(dt.getUTCMonth()!==mo) return null;
+  return iso(y,mo,d);
+}
+function parseYY(str,past){ // DDMMMYY
+  const m=/^(\d{2})([A-Z]{3})(\d{2})$/.exec(str); if(!m) return null;
+  const d=+m[1], mo=MON.indexOf(m[2]); if(mo<0) return null;
+  let y=2000+(+m[3]); if(past && y>+today().slice(0,4)) y-=100;
+  const dt=new Date(Date.UTC(y,mo,d)); if(dt.getUTCMonth()!==mo||dt.getUTCDate()!==d) return null;
+  return iso(y,mo,d);
+}
+function hhmm(min){min=((min%1440)+1440)%1440;return String(Math.floor(min/60)).padStart(2,'0')+String(min%60).padStart(2,'0');}
+function durStr(min){return Math.floor(min/60)+':'+String(min%60).padStart(2,'0');}
+function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function rng(seed){let a=hash(seed);return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function dist(a,b){const A=AP[a],B=AP[b];const R=6371,r=x=>x*Math.PI/180;const dLa=r(B[4]-A[4]),dLo=r(B[5]-A[5]);const h=Math.sin(dLa/2)**2+Math.cos(r(A[4]))*Math.cos(r(B[4]))*Math.sin(dLo/2)**2;return Math.round(2*R*Math.asin(Math.sqrt(h)));}
+function lev(a,b){const m=a.length,n=b.length;const d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function utcNow(){const d=new Date();return String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0');}
+function curFor(c){return CUR[c]||['USD',1,2];}
+function money(v,dec){return Number(v).toFixed(dec);}
+function luhn(num){let s=0,alt=false;for(let i=num.length-1;i>=0;i--){let n=+num[i];if(alt){n*=2;if(n>9)n-=9;}s+=n;alt=!alt;}return s%10===0;}
+const LOCCH='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newLoc(){let s;do{s='';for(let i=0;i<6;i++)s+=LOCCH[Math.floor(Math.random()*LOCCH.length)];}while(state.db[s]);return s;}
+function D(n){return ddmmm(addDays(today(),n));}
+
+/* =================== FLIGHT GENERATOR =================== */
+function classesFor(al){return al==='G9'?ECO.slice():BIZ.concat(ECO);}
+function mkSeats(r,al){const s={};classesFor(al).forEach(c=>{const ei=ECO.indexOf(c);let v;if(ei<0)v=r()<0.72?9:Math.floor(r()*10);else{const p=ei/ECO.length;v=r()<0.08+p*0.5?0:(r()<0.6?9:1+Math.floor(r()*8));}s[c]=v;});if(s.Y===0)s.Y=9;return s;}
+function eqFor(al,d,r){const nar=['320','321','738','7M8','32N'],wide=['77W','359','788','789','388','333','773'];if(al==='BS'&&d<700)return'AT7';if(LCC.has(al)||d<1800)return nar[Math.floor(r()*nar.length)];if(d<4500)return['321','332','788','738'][Math.floor(r()*4)];return wide[Math.floor(r()*wide.length)];}
+function termFor(code,al){const big=['DXB','DOH','JED','RUH','LHR','CDG','FRA','JFK','SIN','DEL','BOM','IST','KUL','BKK','DAC'];return big.includes(code)?String(hash(code+al)%3+1):' ';}
+function mkLeg(al,from,to,date,depMin,k,r){
+  const d=dist(from,to);const dur=Math.round(d/790*60+35);
+  const arrLocal=depMin+dur+Math.round((AP[to][3]-AP[from][3])*60);
+  const off=Math.floor(arrLocal/1440);
+  return {al,fn:String(100+(hash(al+from+to)%780)+k*2),from,to,date,dep:hhmm(depMin),depMin,arr:hhmm(arrLocal),arrMin:((arrLocal%1440)+1440)%1440,arrOff:off,arrDate:addDays(date,off),eq:eqFor(al,d,r),dur,dist:d,seats:mkSeats(r,al),tf:termFor(from,al),tt:termFor(to,al)};
+}
+function genAvail(from,to,date,alf){
+  const r=rng(from+to+date);const d=dist(from,to);const fc=AP[from][2],tc=AP[to][2];const opts=[];
+  const mins=[0,5,10,15,20,25,30,35,40,45,50,55];
+  for(const [al,info] of Object.entries(AL)){
+    const hubs=info[2],home=info[3];
+    const direct=hubs.includes(from)||hubs.includes(to)||(fc===home&&tc===home);
+    const rr=rng(al+from+to+date);
+    if(direct){
+      if(LCC.has(al)&&d>5000)continue; if(al==='BS'&&d>5500)continue; if(d>14500)continue;
+      const freq=d<2600?(rr()<0.5?2:1):1;
+      for(let k=0;k<freq;k++){const dep=Math.floor(rr()*24)*60+mins[Math.floor(rr()*12)];opts.push({legs:[mkLeg(al,from,to,date,dep,k,rr)],lay:0});}
+    } else {
+      for(const h of hubs){
+        if(h===from||h===to)continue; const d1=dist(from,h),d2=dist(h,to);
+        if(d1+d2>d*1.38+500)continue; if(LCC.has(al)&&(d1>5000||d2>5000))continue;
+        const dep=Math.floor(rr()*24)*60+mins[Math.floor(rr()*12)];
+        const l1=mkLeg(al,from,h,date,dep,0,rr);const lay=80+Math.floor(rr()*220);
+        let m2=l1.arrMin+lay,dt2=l1.arrDate; if(m2>=1440){m2-=1440;dt2=addDays(dt2,1);}
+        const l2=mkLeg(al,h,to,dt2,m2,1,rr); opts.push({legs:[l1,l2],lay}); break;
+      }
+    }
+  }
+  opts.forEach(o=>{o.total=o.legs.reduce((a,l)=>a+l.dur,0)+o.lay;});
+  let res=opts.filter(o=>!alf||alf.includes(o.legs[0].al));
+  res.sort((a,b)=>(a.legs.length-b.legs.length)||(a.legs[0].depMin-b.legs[0].depMin));
+  return res.slice(0,14);
+}
+function fareUSD(seg,rbd){const cf=0.88+(hash(seg.al)%30)/100;return Math.round((seg.dist*0.07*(MULT[rbd]||1)*cf+45)*100)/100;}
+
+/* =================== STATE =================== */
+function newPnr(){return{loc:null,names:[],segs:[],els:[],tst:[],tickets:[],rf:'',dirty:false,tat:0,created:null,time:null,hist:[]};}
+let state={signed:false,agent:'',pnr:newPnr(),db:{},avail:null,mistakes:[],events:[],queues:{},qcur:null,rtList:null,hist:[],fs:13.5};
+const KEY='amadeus-practice-v1';
+function persist(){try{localStorage.setItem(KEY,JSON.stringify({...state,avail:null}));}catch(e){}}
+function restore(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.pnr){state={...state,...s,avail:null};}}catch(e){}}
+let hidx=-1;
+const P=()=>state.pnr;
+function nid(){return ++P().tat;}
+function emit(ev){if(!state.events.includes(ev))state.events.push(ev);}
+function changed(){P().dirty=true;}
+function hasContent(p){return p.names.length||p.segs.length||p.els.length||p.loc;}
+
+/* =================== OUTPUT =================== */
+let curBlk=null;
+function newBlock(cmd){
+  const s=$('#screen');const b=document.createElement('div');b.className='blk new';
+  if(cmd!=null){const c=document.createElement('div');c.className='cmdline';c.textContent='>'+cmd;b.appendChild(c);}
+  s.appendChild(b);curBlk=b;while(s.children.length>220)s.removeChild(s.firstChild);return b;
+}
+function out(text,cls){const pre=document.createElement('pre');pre.className='resp'+(cls?' '+cls:'');pre.textContent=text;curBlk.appendChild(pre);}
+function exBtns(list){return(list||[]).map(c=>`<button type="button" class="ex" data-cmd="${esc(c)}">${esc(c)}</button>`).join('');}
+function card(html,info){const d=document.createElement('div');d.className='hintcard'+(info?' info':'');d.innerHTML=html;curBlk.appendChild(d);}
+let lastCmd='';
+function err(msg,bn,fixes,more){
+  out(msg,'err');
+  if(bn||fixes){
+    card(`<b>সাজেশন:</b> ${bn||''}${more?`<div style="margin-top:4px">${more}</div>`:''}${fixes&&fixes.length?`<div style="margin-top:6px">সঠিক ফরম্যাট: ${exBtns(fixes)}</div>`:''}`);
+  }
+  state.mistakes.unshift({cmd:lastCmd,msg,bn:bn||'',fix:(fixes||[])[0]||'',t:Date.now()});
+  state.mistakes=state.mistakes.slice(0,60);
+  return false;
+}
+function tip(bn,cmds){card(`${bn}${cmds&&cmds.length?`<div style="margin-top:5px">${exBtns(cmds)}</div>`:''}`,true);}
+function need(cond,msg,bn,fixes){if(!cond){err(msg,bn,fixes);return false;}return true;}
+
+/* =================== PNR RENDER =================== */
+const ELORDER=['AP','TK','SSR','OSI','RM','RC','FA','FM','FP','FV'];
+function sortSegs(p){p.segs.sort((a,b)=>(a.date+a.dep).localeCompare(b.date+b.dep));}
+function items(p){
+  sortSegs(p);const it=[];let n=0;
+  p.names.forEach(x=>it.push({k:'name',r:x,n:++n}));
+  p.segs.forEach(x=>it.push({k:'seg',r:x,n:++n}));
+  [...p.els].sort((a,b)=>ELORDER.indexOf(a.type)-ELORDER.indexOf(b.type)).forEach(x=>it.push({k:'el',r:x,n:++n}));
+  return it;
+}
+function numMap(p){const m={};items(p).forEach(i=>{m[i.r.id]=i.n;});return m;}
+function nameStr(x){let s=`${x.sur}/${x.given}${x.title?' '+x.title:''}`;if(x.type==='CHD')s+=`(CHD${x.dob?'/'+ddmmmyy(x.dob):''})`;if(x.inf)s+=`(INF${x.inf.sur}/${x.inf.given}/${ddmmmyy(x.inf.dob)})`;return s;}
+function segStr(s,p){
+  const tail=(s.status==='HK'&&p.loc&&s.aloc)?`E  ${s.al}/${s.aloc}`:`E  0 ${s.eq} M`;
+  return `${s.al.padEnd(2)} ${s.fn.padStart(4)} ${s.cls} ${ddmmm(s.date)} ${dowNum(s.date)} ${s.from}${s.to} ${s.status}${s.n}  ${s.dep} ${s.arr}  ${ddmmm(s.arrDate)}  ${tail}`;
+}
+function refs(e,m){let r='';if(e.seg&&e.seg.length)r+='/S'+e.seg.map(id=>m[id]).filter(Boolean).join(',');if(e.pax)r+='/P'+(m[e.pax]||'?');return r;}
+function elStr(e,p,m){
+  switch(e.type){
+    case'AP':return 'AP'+(e.sub?e.sub:'')+' '+e.text;
+    case'TK':return 'TK '+e.text;
+    case'SSR':
+      if(e.code==='DOCS')return `SSR DOCS ${e.al} ${e.st}1 ${e.text}${refs(e,m)}`;
+      if(e.code==='RQST')return `SSR RQST ${e.al} ${e.st}1 ${e.text}${refs(e,m)}`;
+      return `SSR ${e.code} ${e.al} ${e.st}1${e.text?' '+e.text:''}${refs(e,m)}`;
+    case'OSI':return `OSI ${e.al} ${e.text}`;
+    case'RM':return 'RM '+e.text;
+    case'RC':return 'RC '+e.text;
+    case'FA':{const t=p.tickets.find(x=>x.id===e.tk);if(!t)return'FA ?';return `FA PAX${t.inf?' INF':''} ${t.num.slice(0,3)}-${t.num.slice(3)}/ET${t.al}/${t.cur}${t.total}/${ddmmmyy(t.date)}/${OFFICE}/00000000${t.status!=='OK'?' *'+t.status+'*':''}/S${t.segs.map(id=>m[id]).join(',')}/P${m[t.pax]||'?'}`;}
+    case'FM':return 'FM *M*'+e.text;
+    case'FP':return 'FP '+e.text;
+    case'FV':return 'FV PAX *F*'+e.text;
+  }return e.type+' '+(e.text||'');
+}
+function renderPNR(p){
+  if(!hasContent(p))return'NO ACTIVE PNR';
+  const it=items(p);const m={};it.forEach(i=>m[i.r.id]=i.n);const L=[];
+  if(p.loc)L.push(p.tst.length?'--- TST RLR ---':'--- RLR ---');
+  let h='RP/'+OFFICE+'/';
+  if(p.loc){h=(h+OFFICE).padEnd(32)+`${state.agent.slice(4)||'AA'}/SU  ${ddmmmyy(p.created)}/${p.time}Z   ${p.loc}`;}
+  L.push(h);
+  // names on wrapped lines
+  let line='';
+  it.filter(i=>i.k==='name').forEach(i=>{const s=`${i.n}.${nameStr(i.r)}`;if(line&&(line.length+s.length+3)>72){L.push('  '+line);line='';}line+=(line?'   ':'')+s;});
+  if(line)L.push('  '+line);
+  it.filter(i=>i.k!=='name').forEach(i=>{L.push(String(i.n).padStart(3)+'  '+(i.k==='seg'?segStr(i.r,p):elStr(i.r,p,m)));});
+  if(p.rf&&p.dirty)L.push('     RF '+p.rf);
+  if(!p.segs.length&&p.names.length)L.push('     NO ITINERARY');
+  return L.join('\n');
+}
+function showPNR(){out(renderPNR(P()));}
+
+/* =================== COMMANDS =================== */
+function cmdHE(cs){
+  const t=cs.replace(/^(HELP|HE|\?)/,'').trim();
+  if(!t){out('HELP TOPICS - HE <CODE>\n'+CMDS.map(c=>`  ${c.code.padEnd(6)} ${c.en}`).join('\n'));tip('যেকোনো কমান্ডের বিস্তারিত দেখতে HE এর পর কোড লিখুন।',['HE AN','HE NM','HE TTP']);return;}
+  const f=CMDS.filter(c=>c.code===t||c.code.startsWith(t));
+  if(!f.length)return err('NO HELP FOR '+t,'এই কোডের কোনো হেল্প নেই। পুরো তালিকা দেখতে শুধু HE দিন।',['HE']);
+  f.forEach(c=>{out(`${c.code} - ${c.en}\nFORMAT : ${c.fmt}\nEXAMPLE: ${c.ex.map(fill).join('   ')}`);});
+  tip(f[0].bn,f[0].ex.map(fill));
+}
+function cmdJI(cs){
+  const m=/^JI(\d{4})([A-Z]{2})\/(SU|AS|GS)$/.exec(cs);
+  if(!m){
+    if(/^JI\d{4}[A-Z]{2}$/.test(cs))return err('CHECK FORMAT - DUTY CODE MISSING','সাইনের পরে ডিউটি কোড (/SU) দিতে হবে।',[cs+'/SU']);
+    return err('INVALID SIGN','সাইন ইন ফরম্যাট: JI + ৪ ডিজিট + ২ অক্ষরের ইনিশিয়াল + /SU (সুপারভাইজার)।',['JI1234AB/SU']);
+  }
+  if(state.signed)return err('ALREADY SIGNED IN - '+state.agent,'আগে থেকেই সাইন ইন আছেন। অন্য সাইনে ঢুকতে আগে JO দিয়ে সাইন আউট করুন।',['JO','JD']);
+  state.signed=true;state.agent=m[1]+m[2];emit('JI');
+  out(`${OFFICE}  ${m[2]}  ${m[1]}  SIGN IN  A\n${ddmmmyy(today())}  ${utcNow()}Z  DUTY CODE ${m[3]}\nWORK AREA A - ACTIVE`,'okm');
+  tip('সাইন ইন সফল। এবার ফ্লাইট খুঁজুন অথবা কোড চেনা প্র্যাকটিস করুন।',['AN'+D(30)+'DMMDAC','DACDXB','DNAEK']);
+}
+function cmdJO(){if(hasContent(P())&&P().dirty)return err('FINISH OR IGNORE','PNR-এ সেভ না করা পরিবর্তন আছে। আগে ET (সেভ) বা IG (বাতিল) দিন, তারপর সাইন আউট।',['ET','IG']);state.signed=false;state.pnr=newPnr();out(`${OFFICE}  SIGNED OUT  A`,'okm');}
+function cmdJD(){out(`AREA  SIGN    OFFICE      DUTY  STATUS\n A    ${state.agent.padEnd(6)}  ${OFFICE}   SU    SIGNED  ACTIVE\n B-F                               NOT SIGNED`);}
+function cmdDAC(cs){
+  const c=cs.slice(3);
+  if(!/^[A-Z]{3}$/.test(c))return err('CHECK FORMAT','DAC এর পরে ৩ অক্ষরের শহর/এয়ারপোর্ট কোড দিন।',['DACDXB','DACJED']);
+  const a=AP[c];if(!a)return err('NO MATCH FOR '+c,`${c} কোডটি এই সিমুলেটরের ডেটায় নেই। নাম দিয়ে খুঁজতে DAN ব্যবহার করুন।`,['DAN'+c.slice(0,2)]);
+  emit('DAC');
+  out(`DAC ${c}\n${c}  C  ${a[0]} /${a[2]} ${CTRY[a[2]]||''}\n     A  ${c} - ${a[1]} - ${Math.abs(a[4]).toFixed(2)}${a[4]>=0?'N':'S'} ${Math.abs(a[5]).toFixed(2)}${a[5]>=0?'E':'W'}\n     TIME ZONE GMT ${a[3]>=0?'+':''}${a[3]}`);
+}
+function cmdDAN(cs,c){
+  const q=c.slice(3).trim();if(q.length<2)return err('CHECK FORMAT','DAN এর পরে শহরের নাম (অন্তত ২ অক্ষর) দিন।',['DANDUBAI','DANJEDDAH']);
+  const res=Object.entries(AP).filter(([k,v])=>v[0].startsWith(q)||v[1].startsWith(q)||v[0].replace(/ /g,'').startsWith(q.replace(/ /g,'')));
+  if(!res.length)return err('NO MATCH FOR '+q,'এই নামে কোনো শহর পাওয়া যায়নি। বানান দেখুন বা নামের প্রথম কয়েক অক্ষর দিন।',['DANDHA','DANLON']);
+  emit('DAN');
+  out(`DAN ${q}\n`+res.map(([k,v])=>`${k}  C  ${v[0]} /${v[2]}\n     A  ${k} - ${v[1]}`).join('\n'));
+}
+function cmdDNA(cs,c){
+  const q=c.slice(3).trim();if(!q)return err('CHECK FORMAT','DNA এর পরে ২ অক্ষরের এয়ারলাইন কোড বা এয়ারলাইনের নাম দিন।',['DNAEK','DNA SAUDIA']);
+  let res=AL[q]?[[q,AL[q]]]:Object.entries(AL).filter(([k,v])=>v[0].startsWith(q)||v[0].includes(q));
+  if(!res.length)return err('NO MATCH FOR '+q,'এই কোড/নামে কোনো এয়ারলাইন নেই।',['DNAQR','DNABG']);
+  emit('DNA');
+  out(`DNA ${q}\n`+res.map(([k,v])=>`${k}/${v[1]}  ${v[0]}\n        HUB ${v[2].join(' ')}   COUNTRY ${CTRY[v[3]]||v[3]}`).join('\n'));
+}
+function cmdDNE(cs){const q=cs.slice(3);if(!EQ[q])return err('NO MATCH FOR '+(q||'?'),'DNE এর পরে ৩ অক্ষরের এয়ারক্রাফট কোড দিন।',['DNE77W','DNE738']);emit('DNE');out(`DNE ${q}\n${q}  ${EQ[q]}`);}
+function cmdDD(cs){
+  const q=cs.slice(2);if(!q)return out(`${OFFICE} LOCAL TIME ${hhmm(new Date().getUTCHours()*60+new Date().getUTCMinutes()+180)} ${ddmmmyy(today())}`);
+  if(!AP[q])return err('CHECK CITY CODE','DD এর পরে সঠিক শহর কোড দিন।',['DDDXB','DDJFK']);
+  const n=new Date();const lm=n.getUTCHours()*60+n.getUTCMinutes()+Math.round(AP[q][3]*60);emit('DD');
+  out(`${q}  ${AP[q][0]}  LOCAL TIME ${hhmm(lm)}   GMT ${AP[q][3]>=0?'+':''}${AP[q][3]}`);
+}
+function cmdDO(cs){
+  const p=P();if(!p.segs.length)return err('NO ITINERARY','DO দিয়ে বুক করা সেগমেন্টের ফ্লাইট ইনফো দেখা যায়। আগে সেগমেন্ট সেল করুন।',['AN'+D(30)+'DACDXB']);
+  const m=numMap(p);const n=cs.slice(2);let segs=p.segs;
+  if(n){segs=p.segs.filter(s=>String(m[s.id])===n);if(!segs.length)return err('CHECK SEGMENT NUMBER','এই নম্বরে কোনো সেগমেন্ট নেই। RT দিয়ে নম্বর দেখে নিন।',['DO'+m[p.segs[0].id]]);}
+  emit('DO');
+  out(segs.map(s=>`DO ${s.al}${s.fn} ${ddmmm(s.date)}\n${s.from} ${s.dep}  ${s.to} ${s.arr}${s.arrOff?'+'+s.arrOff:''}  ${s.eq} ${EQ[s.eq]||''}\nELAPSED ${durStr(s.dur)}  MILES ${Math.round(s.dist*0.621)}  MEAL M  E-TICKET ELIGIBLE`).join('\n\n'));
+}
+
+/* ---- Availability ---- */
+function cmdAN(cs){
+  const wrong=/^(AN|AD|SN|TN)([A-Z]{3})([A-Z]{3})(\d{1,2}[A-Z]{3})$/.exec(cs);
+  if(wrong)return err('CHECK FORMAT','তারিখ সবার আগে বসবে, তারপর FROM তারপর TO।',[`${wrong[1]}${wrong[4]}${wrong[2]}${wrong[3]}`]);
+  if(/-/.test(cs)){const f=cs.replace(/-/g,'');return err('CHECK FORMAT','শহর কোডের মাঝে ড্যাশ (-) লাগে না।',[f]);}
+  const m=/^(AN|AD|SN|TN)(\d{1,2}[A-Z]{3}(?:\d{2})?)?([A-Z]{3})([A-Z]{3})(\d{4})?((?:\/[A-Z][A-Z0-9,]*)*)$/.exec(cs);
+  if(!m){
+    return err('CHECK FORMAT','অ্যাভেইলেবিলিটি ফরম্যাট: AN + তারিখ + FROM + TO। এয়ারলাইন ফিল্টার চাইলে শেষে /A + কোড।',['AN'+D(30)+'DACDXB','AN'+D(30)+'DMMDAC/ABG']);
+  }
+  let date=today();
+  if(m[2]){date=parseDate(m[2]);if(!date)return err('INVALID DATE',`${m[2]} সঠিক তারিখ নয়। ফরম্যাট: দিন (২ ডিজিট) + মাসের ৩ অক্ষর, যেমন 25DEC।`,['AN'+D(30)+m[3]+m[4]]);}
+  if(date<today())return err('PAST DATE NOT ALLOWED','অতীতের তারিখে ফ্লাইট দেখা যায় না।',['AN'+D(30)+m[3]+m[4]]);
+  if(dayDiff(today(),date)>355)return err('DATE OUT OF RANGE','৩৫৫ দিনের বেশি পরের ফ্লাইট এখনো খোলা নেই।',['AN'+D(60)+m[3]+m[4]]);
+  for(const c of[m[3],m[4]])if(!AP[c])return err('CHECK CITY/AIRPORT CODE - '+c,`${c} কোডটি চেনা যায়নি। শহরের নাম জানলে DAN দিয়ে কোড বের করুন।`,['DAN'+c.slice(0,3),'AN'+(m[2]||D(30))+'DACDXB']);
+  if(m[3]===m[4])return err('CHECK CITY PAIR','FROM আর TO একই শহর হতে পারে না।',['AN'+(m[2]||D(30))+'DACDXB']);
+  let alf=null;
+  if(m[6]){const opts=m[6].split('/').filter(Boolean);for(const o of opts){if(o[0]==='A'){alf=o.slice(1).split(',');for(const a of alf)if(!AL[a])return err('CHECK AIRLINE CODE - '+a,'অপশন /A এর পরে ২ অক্ষরের এয়ারলাইন কোড দিন।',['AN'+(m[2]||D(30))+m[3]+m[4]+'/AEK']);}else return err('OPTION NOT SUPPORTED - /'+o,'এই সিমুলেটরে শুধু /A (এয়ারলাইন) অপশন আছে।',['AN'+(m[2]||D(30))+m[3]+m[4]+'/AEK']);}}
+  let opts=genAvail(m[3],m[4],date,alf);
+  if(m[5]){const t=+m[5].slice(0,2)*60+ +m[5].slice(2);opts=opts.filter(o=>o.legs[0].depMin>=t).concat(opts.filter(o=>o.legs[0].depMin<t));}
+  if(!opts.length)return err('NO AVAILABILITY',alf?'এই এয়ারলাইন এই রুটে ফ্লাইট চালায় না। ফিল্টার ছাড়া দেখুন।':'এই রুটে কোনো ফ্লাইট পাওয়া যায়নি।',['AN'+ddmmm(date)+m[3]+m[4]]);
+  state.avail={from:m[3],to:m[4],date,alf,opts,page:0,type:m[1],time:m[5]||''};
+  emit('AN');if(alf)emit('ANA');
+  showAvail();
+}
+function showAvail(){
+  const A=state.avail;const per=6;const st=A.page*per;const list=A.opts.slice(st,st+per);
+  const L=[];
+  const title=A.type==='SN'?'SCHEDULES':A.type==='TN'?'TIMETABLE':'AVAILABILITY';
+  L.push(`** AMADEUS ${title} - ${A.type} ** ${A.to} ${AP[A.to][0]}.${AP[A.to][2]}`.padEnd(62)+`${dow2(A.date)} ${ddmmm(A.date)} 0000`);
+  list.forEach((o,i)=>{
+    o.legs.forEach((l,j)=>{
+      const cl=classesFor(l.al).map(c=>A.type==='SN'||A.type==='TN'?c+'S':c+l.seats[c]);
+      const c1=cl.slice(0,8).join(' ').padEnd(23),c2=cl.slice(8).join(' ');
+      const num=j===0?String(st+i+1).padStart(2):'  ';
+      const last=j===o.legs.length-1;
+      L.push(`${num}   ${l.al.padEnd(2)}${l.fn.padStart(5)}  ${c1} /${l.from} ${l.tf} ${l.to} ${l.tt}  ${l.dep}    ${l.arr}${l.arrOff?'+'+l.arrOff:'  '} E0/${l.eq}${last?'   '+durStr(o.total):''}`);
+      if(c2)L.push(`               ${c2}`);
+    });
+  });
+  if(A.opts.length>st+per)L.push('                        MD FOR MORE');
+  out(L.join('\n'));
+  if(A.page===0)tip(`সিট সেল করতে: <b>SS</b> + সিট সংখ্যা + ক্লাস + লাইন নম্বর। ক্লাসের পাশে সংখ্যা মানে ফাঁকা সিট (0 = বন্ধ)।${A.opts.some(o=>o.legs.length>1)?' কানেক্টিং লাইন সেল করলে দুটো সেগমেন্টই একসাথে বুক হবে।':''}`,['SS1Y1','SS1M2','MD']);
+}
+function cmdAC(cs){
+  const A=state.avail;
+  const m=/^AC(R)?(\d{1,2}[A-Z]{3}(?:\d{2})?)?(?:\/A([A-Z0-9]{2}))?$/.exec(cs);
+  if(!A)return err('NO AVAILABILITY DISPLAYED','AC/ACR দিয়ে আগের অ্যাভেইলেবিলিটি পরিবর্তন করা হয়। আগে AN দিন।',['AN'+D(30)+'DACDXB']);
+  if(!m||(!m[2]&&!m[3]&&!m[1]))return err('CHECK FORMAT','তারিখ বদলাতে AC + নতুন তারিখ; রিটার্ন দেখতে ACR + তারিখ; এয়ারলাইন বদলাতে AC/A + কোড।',['AC'+D(32),'ACR'+D(45),'AC/AEK']);
+  let from=A.from,to=A.to,date=A.date,alf=A.alf;
+  if(m[1]){[from,to]=[to,from];if(!m[2])return err('NEED RETURN DATE','ACR এর সাথে ফেরার তারিখ দিন।',['ACR'+ddmmm(addDays(A.date,7))]);}
+  if(m[2]){date=parseDate(m[2]);if(!date)return err('INVALID DATE','তারিখ ফরম্যাট ভুল। যেমন 25DEC।',['AC'+D(32)]);}
+  if(m[1]&&date<A.date)return err('CHECK RETURN DATE','ফেরার তারিখ যাওয়ার তারিখের আগে হতে পারে না।',['ACR'+ddmmm(addDays(A.date,7))]);
+  if(m[3]){if(!AL[m[3]])return err('CHECK AIRLINE CODE','এয়ারলাইন কোড ভুল।',['AC/AEK']);alf=[m[3]];}
+  const opts=genAvail(from,to,date,alf);
+  if(!opts.length)return err('NO AVAILABILITY','এই তারিখ/এয়ারলাইনে কোনো ফ্লাইট নেই।',['AC'+ddmmm(date)]);
+  state.avail={...A,from,to,date,alf,opts,page:0};emit(m[1]?'ACR':'AC');showAvail();
+}
+function cmdMove(cs){
+  const A=state.avail;if(!A)return err('NOTHING TO SCROLL','MD/MU দিয়ে অ্যাভেইলেবিলিটির পেজ বদলানো হয়।',['AN'+D(30)+'DACDXB']);
+  const pages=Math.ceil(A.opts.length/6);
+  if(cs==='MD'||cs==='MB'){if(A.page>=pages-1)return err('NO MORE ITEMS','আর কোনো ফ্লাইট নেই। অন্য তারিখ দেখতে AC দিন।',['AC'+ddmmm(addDays(A.date,1)),'MU']);A.page=cs==='MB'?pages-1:A.page+1;}
+  else{if(A.page===0)return err('TOP OF DISPLAY','আপনি প্রথম পেজেই আছেন।',['MD']);A.page=cs==='MT'?0:A.page-1;}
+  emit('MD');showAvail();
+}
+
+/* ---- Sell ---- */
+function addSegFromLeg(l,cls,n){
+  const p=P();
+  if(p.segs.some(s=>s.al===l.al&&s.fn===l.fn&&s.date===l.date))return 'DUP';
+  p.segs.push({id:nid(),al:l.al,fn:l.fn,cls,date:l.date,from:l.from,to:l.to,dep:l.dep,arr:l.arr,arrDate:l.arrDate,arrOff:l.arrOff,eq:l.eq,dur:l.dur,dist:l.dist,n,status:'DK',seats:{...l.seats},cabin:BIZ.includes(cls)?'J':'Y',aloc:null});
+  l.seats[cls]-=n;return 'OK';
+}
+function cmdSS(cs){
+  const long=/^SS([A-Z0-9]{2})(\d{1,4})([A-Z])(\d{1,2}[A-Z]{3}(?:\d{2})?)([A-Z]{3})([A-Z]{3})(\d)$/.exec(cs);
+  if(long){
+    const date=parseDate(long[4]);if(!date)return err('INVALID DATE','তারিখ ভুল।',['SSEK585Y'+D(30)+'DACDXB1']);
+    if(!AP[long[5]]||!AP[long[6]])return err('CHECK CITY CODE','শহরের কোড ভুল।',['DANDHA']);
+    const l=genAvail(long[5],long[6],date,null).flatMap(o=>o.legs).find(x=>x.al===long[1]&&x.fn===long[2].replace(/^0+/,'')&&x.from===long[5]&&x.to===long[6]);
+    if(!l){const any=genAvail(long[5],long[6],date,[long[1]]).filter(o=>o.legs.length===1);return err('FLIGHT DOES NOT OPERATE','এই ফ্লাইট নম্বর ওই তারিখে এই রুটে চলে না। AN দিয়ে আসল ফ্লাইট নম্বর দেখে নিন।',any.length?[`SS${any[0].legs[0].al}${any[0].legs[0].fn}${long[3]}${long[4]}${long[5]}${long[6]}${long[7]}`,'AN'+long[4]+long[5]+long[6]]:['AN'+long[4]+long[5]+long[6]]);}
+    return sellLegs([l],[long[3]],+long[7]);
+  }
+  const m=/^SS(\d)([A-Z]+)(\d{1,2})$/.exec(cs);
+  if(!m){
+    const sp=/^SS(\d)\s*([A-Z])\s*(\d{1,2})/.exec(cs);
+    if(/^SS[A-Z]\d/.test(cs))return err('CHECK FORMAT','SS এর পরে প্রথমে সিট সংখ্যা, তারপর ক্লাস, তারপর লাইন নম্বর।',['SS1'+cs[2]+'1']);
+    return err('CHECK FORMAT','সেল ফরম্যাট: SS + সিট সংখ্যা + বুকিং ক্লাস + অ্যাভেইলেবিলিটির লাইন নম্বর। (লং সেল: SS + এয়ারলাইন + ফ্লাইট + ক্লাস + তারিখ + রুট + সিট)',sp?['SS'+sp[1]+sp[2]+sp[3]]:['SS1Y1','SSEK585Y'+D(30)+'DACDXB1']);
+  }
+  const A=state.avail;if(!A)return err('NO AVAILABILITY DISPLAYED','লাইন নম্বর দিয়ে সেল করতে আগে AN দিয়ে অ্যাভেইলেবিলিটি দেখতে হবে।',['AN'+D(30)+'DACDXB']);
+  const n=+m[1];if(n<1)return err('CHECK NUMBER OF SEATS','সিট সংখ্যা ১ থেকে ৯ এর মধ্যে দিন।',['SS1'+m[2]+m[3]]);
+  const o=A.opts[+m[3]-1];if(!o)return err('CHECK LINE NUMBER',`অ্যাভেইলেবিলিটিতে লাইন ${m[3]} নেই। মোট লাইন ${A.opts.length}টি।`,['SS'+n+m[2]+'1']);
+  let cls=m[2].split('');
+  if(cls.length===1)cls=o.legs.map(()=>cls[0]);
+  if(cls.length!==o.legs.length)return err('CHECK CLASS',`এই লাইনে ${o.legs.length}টি সেগমেন্ট। প্রতিটির জন্য একটি করে ক্লাস দিন অথবা একটি ক্লাস দিন।`,['SS'+n+o.legs.map(()=>'Y').join('')+m[3]]);
+  return sellLegs(o.legs,cls,n);
+}
+function sellLegs(legs,cls,n){
+  const p=P();
+  for(let i=0;i<legs.length;i++){
+    const l=legs[i],c=cls[i];
+    if(!(c in l.seats))return err(`CLASS ${c} NOT OFFERED`,`${l.al} ${l.fn} ফ্লাইটে ${c} ক্লাস নেই।`,['SS'+n+'Y'+(state.avail?state.avail.opts.findIndex(o=>o.legs.includes(l))+1||1:1)]);
+    if(l.seats[c]<n){const open=classesFor(l.al).filter(k=>l.seats[k]>=n);const line=state.avail?state.avail.opts.findIndex(o=>o.legs.includes(l))+1:0;
+      return err(`UNABLE - CLASS ${c} CLOSED`,`${l.al}${l.fn} ফ্লাইটে ${c} ক্লাসে ${n}টি সিট নেই (আছে ${l.seats[c]})। খোলা ক্লাস: ${open.slice(0,6).join(', ')||'নেই'}।`,line&&open.length?open.slice(-3).reverse().map(k=>'SS'+n+k+line):[]);}
+  }
+  if(p.tickets.some(t=>t.status==='OK'))tip('সতর্কতা: এই PNR-এ টিকেট ইস্যু হয়ে গেছে। নতুন সেগমেন্টের জন্য রিইস্যু লাগবে (সিমুলেটরে নতুন TST+TTP দিন)।');
+  for(let i=0;i<legs.length;i++){const r=addSegFromLeg(legs[i],cls[i],n);if(r==='DUP')return err('DUPLICATE SEGMENT','এই ফ্লাইট এই PNR-এ আগেই বুক করা আছে।',['RT']);}
+  if(p.tst.length){p.tst=[];out('WARNING: TST DELETED - ITINERARY CHANGED','err');}
+  changed();emit('SS');if(state.events.includes('ACR')&&p.segs.length>1)emit('SS2');
+  showPNR();
+  if(p.names.length&&p.names.length!==n)tip(`সতর্কতা: PNR-এ ${p.names.length} জন যাত্রী কিন্তু আপনি ${n}টি সিট নিলেন। ET দেওয়ার আগে সংখ্যা মিলাতে হবে।`);
+}
+function cmdSB(cs){
+  const m=/^SB([A-Z])(\d+)$/.exec(cs);const p=P();
+  if(!m)return err('CHECK FORMAT','ক্লাস পরিবর্তন (রিবুক): SB + নতুন ক্লাস + সেগমেন্ট নম্বর।',['SBM'+(p.segs.length?numMap(p)[p.segs[0].id]:2)]);
+  const mp=numMap(p);const s=p.segs.find(x=>mp[x.id]===+m[2]);
+  if(!s)return err('CHECK SEGMENT NUMBER','এই নম্বরে কোনো ফ্লাইট সেগমেন্ট নেই। RT দিয়ে সেগমেন্ট নম্বর দেখুন।',p.segs.length?['SB'+m[1]+mp[p.segs[0].id]]:['RT']);
+  if(!(m[1] in s.seats))return err(`CLASS ${m[1]} NOT OFFERED`,'এই ফ্লাইটে এই ক্লাস নেই।',['SBY'+m[2]]);
+  if(s.seats[m[1]]<s.n){const open=classesFor(s.al).filter(k=>s.seats[k]>=s.n);return err(`UNABLE - CLASS ${m[1]} CLOSED`,`খোলা ক্লাস: ${open.join(', ')}`,open.slice(-2).map(k=>'SB'+k+m[2]));}
+  if(s.cls===m[1])return err('SAME CLASS','সেগমেন্টটি আগে থেকেই এই ক্লাসে।',[]);
+  s.seats[s.cls]+=s.n;s.seats[m[1]]-=s.n;s.cls=m[1];s.cabin=BIZ.includes(m[1])?'J':'Y';s.status='DK';
+  if(p.tst.length){p.tst=[];out('WARNING: TST DELETED - REPRICE WITH FXP','err');}
+  changed();emit('SB');showPNR();
+}
+
+/* ---- Names ---- */
+function splitGroups(s){
+  const g=[];let i=0,depth=0,cur=null;
+  while(i<s.length){const ch=s[i];
+    if(depth===0&&/\d/.test(ch)){let j=i;while(j<s.length&&/\d/.test(s[j]))j++;if(cur)g.push(cur);cur={n:+s.slice(i,j),body:''};i=j;continue;}
+    if(ch==='(')depth++;if(ch===')')depth--;if(!cur)return null;cur.body+=ch;i++;}
+  if(cur)g.push(cur);return g;
+}
+function splitTop(s,ch){const r=[];let d=0,c='';for(const x of s){if(x==='(')d++;if(x===')')d--;if(x===ch&&d===0){r.push(c);c='';}else c+=x;}r.push(c);return r;}
+function cmdNM(cs,c){
+  let s=c.slice(2).replace(/^\s+/,'').replace(/^(\d+)\s+/,'$1');
+  const EX=['NM1KHAN/IQBAL MR','NM2KHAN/IQBAL MR/SALMA MRS'];
+  if(!/^\d/.test(s))return err('CHECK NAME FORMAT - NUMBER MISSING','NM এর পরে নামের সংখ্যা (কয়জন) লিখুন, তারপর SURNAME/GIVEN NAME TITLE।',[s.includes('/')?'NM1'+s:'NM1KHAN/IQBAL MR']);
+  const groups=splitGroups(s);if(!groups)return err('CHECK NAME FORMAT','নামের ফরম্যাট ঠিক নেই।',EX);
+  const add=[];const notes=[];
+  for(const g of groups){
+    const body=g.body.trim();
+    if(!body.includes('/')){const w=body.split(/\s+/);return err('CHECK NAME FORMAT - SLASH MISSING','সারনেম আর গিভেন নেমের মাঝে / দিতে হবে। আগে সারনেম (পারিবারিক নাম), তারপর / তারপর নাম ও টাইটেল।',[w.length>1?`NM${g.n}${w[w.length-1]}/${w.slice(0,-1).join(' ')} MR`:'NM1KHAN/IQBAL MR']);}
+    const parts=splitTop(body,'/');const sur=parts[0].trim();const givens=parts.slice(1);
+    if(!/^[A-Z][A-Z' -]*$/.test(sur))return err('INVALID CHARACTERS IN NAME','নামে শুধু ইংরেজি অক্ষর, স্পেস বা হাইফেন চলবে। সংখ্যা বা চিহ্ন নয়।',EX);
+    if(givens.length!==g.n)return err('CHECK NUMBER OF NAMES',`আপনি ${g.n} লিখেছেন কিন্তু ${givens.length}টি নাম দিয়েছেন। সংখ্যা আর নাম মিলতে হবে।`,[`NM${givens.length}${body}`]);
+    for(let gv of givens){
+      gv=gv.trim();let paren=null;const pm=/^(.*?)\((.*)\)$/.exec(gv);if(pm){gv=pm[1].trim();paren=pm[2].trim();}
+      if(!gv)return err('CHECK NAME FORMAT - GIVEN NAME MISSING','/ এর পরে যাত্রীর নাম দিন।',EX);
+      const w=gv.split(/\s+/);let title='';if(w.length>1&&TITLES.includes(w[w.length-1]))title=w.pop();
+      const given=w.join(' ');
+      if(!/^[A-Z][A-Z' -]*$/.test(given))return err('INVALID CHARACTERS IN NAME','নামে শুধু ইংরেজি অক্ষর দিন।',EX);
+      const nm={id:nid(),sur,given,title,type:'ADT',dob:null,inf:null};
+      if(!title)notes.push(`${given}: টাইটেল (MR/MRS/MS/MSTR/MISS) দেওয়া হয়নি — এয়ারলাইন সাধারণত টাইটেল চায়।`);
+      if(title==='MSTR'||title==='MISS'){if(!paren)notes.push(`${given}: MSTR/MISS সাধারণত চাইল্ড। চাইল্ড হলে (CHD/জন্মতারিখ) যোগ করুন, নাহলে অ্যাডাল্ট ভাড়া ধরা হবে।`);}
+      if(paren){
+        if(/^CHD/.test(paren)){
+          const cm=/^CHD(?:\/(\d{2}[A-Z]{3}\d{2}))?$/.exec(paren);if(!cm)return err('CHECK CHILD FORMAT','চাইল্ড ফরম্যাট: নামের পরে (CHD/জন্মতারিখ DDMMMYY)।',[`NM1${sur}/${given} ${title||'MSTR'}(CHD/12MAR18)`]);
+          nm.type='CHD';if(cm[1]){const d=parseYY(cm[1],true);if(!d||d>today())return err('INVALID DATE OF BIRTH','জন্মতারিখ ভুল। ফরম্যাট DDMMMYY, যেমন 12MAR18।',[`NM1${sur}/${given} ${title||'MSTR'}(CHD/12MAR18)`]);const age=dayDiff(d,today())/365.25;if(age<2||age>=12)return err('CHILD AGE MUST BE 2-11',`বয়স ${Math.floor(age)} বছর। চাইল্ড মানে ২ থেকে ১১ বছর। ${age<2?'২ বছরের কম হলে ইনফ্যান্ট (INF) হিসেবে অ্যাডাল্টের সাথে যোগ করুন।':'১২ বা তার বেশি হলে অ্যাডাল্ট।'}`,[age<2?`NM1KHAN/IQBAL MR(INF${given}/${cm[1]})`:`NM1${sur}/${given} MR`]);nm.dob=d;}
+          else notes.push(`${given}: চাইল্ডের জন্মতারিখ দেওয়া ভালো, যেমন (CHD/12MAR18)।`);
+          emit('NM_CHD');
+        } else if(/^INF/.test(paren)){
+          const ps=paren.slice(3).split('/');let isur=sur,igiv,idob;
+          if(ps.length===2){igiv=ps[0];idob=ps[1];}else if(ps.length===3){isur=ps[0]||sur;igiv=ps[1];idob=ps[2];}
+          else return err('CHECK INFANT FORMAT','ইনফ্যান্ট (০-২ বছর) অ্যাডাল্টের নামের সাথে যুক্ত হয়: (INF + নাম + / + জন্মতারিখ)। আলাদা সারনেম হলে (INFSURNAME/NAME/DOB)।',[`NM1${sur}/${given} ${title||'MR'}(INF${sur}/ARIF/05JAN25)`]);
+          if(!igiv||!/^[A-Z][A-Z ]*$/.test(igiv))return err('CHECK INFANT NAME','ইনফ্যান্টের নাম দিন।',[`NM1${sur}/${given} ${title||'MR'}(INF${sur}/ARIF/05JAN25)`]);
+          const d=parseYY(idob||'',true);if(!d||d>today())return err('INVALID INFANT DATE OF BIRTH','ইনফ্যান্টের জন্মতারিখ DDMMMYY ফরম্যাটে দিন, যেমন 05JAN25।',[`NM1${sur}/${given} ${title||'MR'}(INF${isur}/${igiv}/05JAN25)`]);
+          if(dayDiff(d,today())/365.25>=2)return err('INFANT MUST BE UNDER 2 YEARS','ইনফ্যান্টের বয়স ২ বছরের কম হতে হবে। বড় হলে চাইল্ড হিসেবে আলাদা নাম দিন।',[`NM1${isur}/${igiv} MSTR(CHD/${idob})`]);
+          if(title==='MSTR'||title==='MISS')return err('INFANT NOT ALLOWED WITH CHILD','ইনফ্যান্ট শুধু অ্যাডাল্টের (MR/MRS/MS) সাথে যুক্ত হয়।',[`NM1${sur}/${given} MRS(INF${isur}/${igiv}/${idob})`]);
+          nm.inf={sur:isur,given:igiv,dob:d};emit('NM_INF');
+        } else return err('CHECK NAME FORMAT','ব্র্যাকেটে শুধু (CHD/DOB) বা (INFNAME/DOB) চলে।',['NM1KHAN/RAFI MSTR(CHD/12MAR18)','NM1KHAN/IQBAL MR(INFKHAN/ARIF/05JAN25)']);
+      }
+      add.push(nm);
+    }
+  }
+  const p=P();
+  if(p.names.length+add.length>9)return err('MAXIMUM 9 NAMES','একটি PNR-এ সর্বোচ্চ ৯ জন যাত্রী। বেশি হলে আলাদা PNR (গ্রুপ) করুন।',[]);
+  p.names.push(...add);changed();emit('NM');showPNR();
+  if(notes.length)tip(notes.join('<br>'));
+}
+
+/* ---- Contact / TK / RF / RM / OS ---- */
+function cmdAP(cs,c){
+  const p=P();let t=c.slice(2).trim();
+  if(!t)return err('CHECK FORMAT - NO DATA','AP এর পরে ফোন নম্বর দিন। মোবাইল: APM-, ইমেইল: APE-',['AP DMM 0501234567','APM-+8801711000000','APE-IQBAL@MAIL.COM']);
+  let sub='';const em=/^E[-\s]?(.+)$/.exec(t),mm=/^M[-\s]?(\+?[\d\s]+)$/.exec(t);
+  if(/^E[-\s]/.test(t)||/^E[A-Z0-9._]+@/.test(t)){sub='E';t=em[1].trim();if(!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/.test(t))return err('INVALID EMAIL ADDRESS','ইমেইল ঠিকানা সঠিক নয় (@ আর ডোমেইন দরকার)।',['APE-IQBAL@MAIL.COM']);emit('APE');}
+  else if(mm){sub='M';t=mm[1].replace(/\s/g,'');if(t.replace(/\D/g,'').length<8)return err('CHECK PHONE NUMBER','মোবাইল নম্বর অন্তত ৮ ডিজিটের হতে হবে।',['APM-+966501234567']);}
+  else{if((t.match(/\d/g)||[]).length<6)return err('CHECK PHONE NUMBER','AP এলিমেন্টে কমপক্ষে ৬ ডিজিটের ফোন নম্বর থাকতে হবে।',['AP DMM 0501234567']);}
+  p.els.push({id:nid(),type:'AP',sub,text:t});changed();emit('AP');showPNR();
+}
+function cmdTK(cs){
+  const p=P();let text;
+  if(/^TKOK$/.test(cs))text='OK'+ddmmm(today())+'/'+OFFICE;
+  else{const m=/^TK(TL|XL)(\d{1,2}[A-Z]{3})(?:\/(\d{4}))?$/.exec(cs);
+    if(!m){if(/^TKTL$/.test(cs))return err('CHECK FORMAT - DATE MISSING','টাইম লিমিটে তারিখ দিন। সময় চাইলে /HHMM।',['TKTL'+D(2)+'/1200']);return err('CHECK FORMAT','টিকেটিং অ্যারেঞ্জমেন্ট: আজ টিকেট হলে TKOK, পরে হলে TKTL + তারিখ/সময়।',['TKOK','TKTL'+D(2)+'/1200']);}
+    const d=parseDate(m[2]);if(!d)return err('INVALID DATE','তারিখ ভুল।',['TKTL'+D(2)]);
+    if(p.segs.length&&d>p.segs[0].date)return err('TICKET TIME LIMIT AFTER DEPARTURE','টাইম লিমিট ফ্লাইটের তারিখের পরে হতে পারে না।',['TKTL'+ddmmm(addDays(p.segs[0].date,-1))]);
+    if(m[3]&&(+m[3].slice(0,2)>23||+m[3].slice(2)>59))return err('INVALID TIME','সময় 24-ঘণ্টা ফরম্যাটে দিন, যেমন 1200।',['TK'+m[1]+m[2]+'/1200']);
+    text=m[1]+ddmmm(d)+(m[3]?'/'+m[3]:'');}
+  if(p.els.some(e=>e.type==='TK'))return err('ONLY ONE TK ELEMENT ALLOWED','একটি PNR-এ একটাই TK এলিমেন্ট থাকে। বদলাতে আগের TK লাইনটি XE দিয়ে বাতিল করুন অথবা নম্বর দিয়ে বদলান।',['XE'+numMap(p)[p.els.find(e=>e.type==='TK').id]]);
+  p.els.push({id:nid(),type:'TK',text});changed();emit('TK');showPNR();
+}
+function cmdRF(cs,c){
+  const t=c.slice(2).trim();const p=P();
+  if(!t)return err('CHECK FORMAT','RF এর পরে কে বুকিং চেয়েছেন বা আপনার নাম লিখুন।',['RFIQBAL','RF PAX BY PHONE']);
+  if(!hasContent(p))return err('NO ACTIVE PNR','RF দেওয়ার মতো কোনো PNR নেই। আগে বুকিং শুরু করুন।',['AN'+D(30)+'DACDXB']);
+  p.rf=t;if(!p.dirty)changed();emit('RF');out('RF '+t);
+}
+function cmdRM(cs,c){
+  const type=c.slice(0,2);let t=c.slice(2).replace(/^\s*[\/-]?\s*/,'').trim();
+  if(!t)return err('CHECK FORMAT - NO TEXT',`${type} এর পরে রিমার্কের লেখা দিন।`,[type+' CUSTOMER PREFERS AISLE']);
+  if(!hasContent(P()))return err('NO ACTIVE PNR','রিমার্ক যোগ করার মতো PNR নেই।',['NM1KHAN/IQBAL MR']);
+  P().els.push({id:nid(),type,text:t});changed();emit('RM');showPNR();
+}
+function cmdOS(cs,c){
+  const m=/^OS\s?([A-Z0-9]{2})\s+(.+)$/.exec(c)||/^OS([A-Z0-9]{2})(.+)$/.exec(c);
+  if(!m)return err('CHECK FORMAT','OSI ফরম্যাট: OS + এয়ারলাইন কোড + স্পেস + তথ্য। সব এয়ারলাইনের জন্য YY।',['OS EK VIP PASSENGER','OS YY CTCP 0501234567']);
+  if(m[1]!=='YY'&&!AL[m[1]])return err('CHECK AIRLINE CODE','এয়ারলাইন কোড ভুল। সব এয়ারলাইনের জন্য YY দিন।',['OS YY '+m[2].trim()]);
+  if(!P().segs.length)return err('NEED ITINERARY','OSI দেওয়ার আগে ফ্লাইট সেগমেন্ট লাগবে।',['AN'+D(30)+'DACDXB']);
+  P().els.push({id:nid(),type:'OSI',al:m[1],text:m[2].trim()});changed();emit('OS');showPNR();
+}
+
+/* ---- SSR ---- */
+function parseRefs(str,p){
+  const m=numMap(p);const r={pax:null,seg:[]};if(!str)return r;
+  for(const part of str.split('/').filter(Boolean)){
+    let x;
+    if((x=/^P(\d+)$/.exec(part))){const nm=p.names.find(n=>m[n.id]===+x[1]);if(!nm)return{err:'P'};r.pax=nm.id;}
+    else if((x=/^S([\d,\-]+)$/.exec(part))){for(const n of expandNums(x[1])){const sg=p.segs.find(s=>m[s.id]===n);if(!sg)return{err:'S'};r.seg.push(sg.id);}}
+    else return{err:'X',part};
+  }
+  return r;
+}
+function expandNums(s){const out=[];for(const p of s.split(',')){const r=/^(\d+)(?:-(\d+))?$/.exec(p);if(!r)return[NaN];const a=+r[1],b=r[2]?+r[2]:a;for(let i=a;i<=b;i++)out.push(i);}return out;}
+function refErr(r,base){const p=P(),m=numMap(p);
+  if(r.err==='P')return err('CHECK PASSENGER NUMBER',`/P এর পরে যাত্রীর নম্বর দিন। এই PNR-এ যাত্রী নম্বর: ${p.names.map(n=>m[n.id]).join(', ')||'নেই'}।`,p.names.length?[base+'/P'+m[p.names[0].id]]:['NM1KHAN/IQBAL MR']);
+  if(r.err==='S')return err('CHECK SEGMENT NUMBER',`/S এর পরে ফ্লাইট সেগমেন্টের এলিমেন্ট নম্বর দিন। সেগমেন্ট নম্বর: ${p.segs.map(s=>m[s.id]).join(', ')||'নেই'}।`,p.segs.length?[base+'/S'+m[p.segs[0].id]]:[]);
+  return err('CHECK FORMAT - '+r.part,'রেফারেন্স হবে /P(যাত্রী) বা /S(সেগমেন্ট)।',[base+'/P1']);
+}
+function cmdSR(cs,c){
+  const p=P();c=c.replace(/^SR\s+DOCS/,'SRDOCS');
+  if(/^SRDOCS/.test(c))return cmdDOCS(c);
+  const m=/^SR\s?([A-Z]{4})(?:\s?([A-Z0-9]{2}))?(?:\s?-(.+?))?((?:\/[PS][\d,\-]+)*)$/.exec(c);
+  if(!m)return err('CHECK FORMAT','SSR ফরম্যাট: SR + ৪ অক্ষরের কোড + /P যাত্রী নম্বর (+ /S সেগমেন্ট)।',['SR MOML/P1','SR WCHR/P1/S3']);
+  const code=m[1];
+  if(!SSRC[code]){const near=Object.keys(SSRC).map(k=>[k,lev(k,code)]).sort((a,b)=>a[1]-b[1]).slice(0,3).map(x=>x[0]);return err('INVALID SSR CODE - '+code,`${code} কোনো স্বীকৃত SSR কোড নয়। কাছাকাছি কোড: ${near.map(k=>k+' ('+SSRC[k]+')').join(', ')}।`,near.map(k=>'SR '+k+'/P1'));}
+  if(!p.segs.length)return err('NEED ITINERARY','SSR দেওয়ার আগে PNR-এ ফ্লাইট সেগমেন্ট লাগবে।',['AN'+D(30)+'DACDXB']);
+  if(!p.names.length)return err('NEED NAME IN PNR','SSR যাত্রীর সাথে যুক্ত হয়। আগে নাম দিন।',['NM1KHAN/IQBAL MR']);
+  if(SSR_TEXT.has(code)&&!m[3])return err('FREE TEXT REQUIRED FOR '+code,`${code} এর সাথে তথ্য দিতে হয় (হাইফেনের পরে)।`,[code==='FQTV'?'SR FQTV EK-EK123456789/P1':code==='CTCE'?'SR CTCE EK-IQBAL//MAIL.COM/P1':'SR '+code+'-DETAILS/P1']);
+  const r=parseRefs(m[4],p);if(r.err)return refErr(r,'SR '+code);
+  if(!r.pax){if(p.names.length>1)return err('PASSENGER ASSOCIATION REQUIRED','একাধিক যাত্রী থাকলে কোন যাত্রীর জন্য তা /P দিয়ে বলতে হবে।',['SR '+code+'/P'+numMap(p)[p.names[0].id]]);r.pax=p.names[0].id;}
+  const nmObj=p.names.find(n=>n.id===r.pax);
+  if((code==='CHML')&&nmObj.type!=='CHD')tip('CHML সাধারণত চাইল্ড যাত্রীর জন্য।');
+  if(code==='BBML'||code==='BSCT'){if(!nmObj.inf)tip(`${code} সাধারণত ইনফ্যান্টসহ যাত্রীর জন্য।`);}
+  const segs=r.seg.length?r.seg:(code.endsWith('ML')||code.startsWith('WCH')?p.segs.map(s=>s.id):[]);
+  const al=m[2]||(segs.length?p.segs.find(s=>s.id===segs[0]).al:p.segs[0].al);
+  if(code.endsWith('ML')||code.startsWith('WCH')){for(const sid of segs){p.els.push({id:nid(),type:'SSR',code,al:p.segs.find(s=>s.id===sid).al,st:p.loc?'HK':'NN',text:m[3]||'',pax:r.pax,seg:[sid]});}}
+  else p.els.push({id:nid(),type:'SSR',code,al,st:p.loc?'HK':'NN',text:m[3]||'',pax:r.pax,seg:segs});
+  changed();emit('SR');emit('SR:'+code);showPNR();
+}
+function cmdDOCS(c){
+  const p=P();const EX='SRDOCS EK HK1-P-BGD-A12345678-BGD-15MAR90-M-20AUG31-KHAN-IQBAL/P1';
+  const al0=p.segs[0]?p.segs[0].al:'EK';const ex=EX.replace('EK',al0);
+  const m=/^SRDOCS\s?([A-Z0-9]{2})?\s?HK1-(.+?)((?:\/P\d+))?$/.exec(c);
+  if(!m){if(!/HK1/.test(c))return err('CHECK FORMAT - HK1 MISSING','DOCS ফরম্যাটে এয়ারলাইন কোডের পরে HK1- লিখতে হয়।',[ex]);return err('CHECK DOCS FORMAT','পাসপোর্ট ফরম্যাট: SRDOCS + এয়ারলাইন + HK1-P-ইস্যু দেশ-পাসপোর্ট নম্বর-জাতীয়তা-জন্মতারিখ-লিঙ্গ-মেয়াদ-সারনেম-নাম/P যাত্রী নম্বর',[ex]);}
+  if(!p.segs.length)return err('NEED ITINERARY','DOCS দেওয়ার আগে ফ্লাইট সেগমেন্ট লাগবে।',['AN'+D(30)+'DACDXB']);
+  if(!p.names.length)return err('NEED NAME IN PNR','আগে যাত্রীর নাম দিন।',['NM1KHAN/IQBAL MR']);
+  const al=m[1]||'YY';if(al!=='YY'&&!AL[al])return err('CHECK AIRLINE CODE','এয়ারলাইন কোড ভুল (সব এয়ারলাইনের জন্য YY)।',[ex]);
+  const f=m[2].split('-');const names=['ডকুমেন্ট টাইপ','ইস্যুকারী দেশ','পাসপোর্ট নম্বর','জাতীয়তা','জন্মতারিখ','লিঙ্গ','মেয়াদ শেষের তারিখ','সারনেম','নাম'];
+  if(f.length<9)return err(`CHECK DOCS FORMAT - ${f.length} OF 9 FIELDS`,`DOCS এ ৯টি অংশ লাগে (হাইফেন দিয়ে আলাদা)। আপনি ${f.length}টি দিয়েছেন। বাকি: ${names.slice(f.length).join(', ')}।`,[ex]);
+  const [type,iss,num,nat,dob,gen,exp,sur]=f;const giv=f.slice(8).join(' ');
+  if(!/^(P|I|A|C)$/.test(type))return err('INVALID DOCUMENT TYPE - '+type,'প্রথম অংশ ডকুমেন্ট টাইপ: পাসপোর্টের জন্য P।',[ex]);
+  for(const [v,nm] of [[iss,'ইস্যুকারী দেশ'],[nat,'জাতীয়তা']]){if(!/^[A-Z]{3}$/.test(v))return err('INVALID COUNTRY CODE - '+v,`${nm} ৩ অক্ষরের ISO কোডে দিন (যেমন BGD, SAU, IND) — ২ অক্ষর (BD) নয়।`,[ex]);}
+  if(!/^[A-Z0-9]{5,15}$/.test(num))return err('INVALID PASSPORT NUMBER','পাসপোর্ট নম্বরে শুধু অক্ষর ও সংখ্যা (৫-১৫ ঘর), কোনো স্পেস নয়।',[ex]);
+  const db=parseYY(dob,true);if(!db||db>today())return err('INVALID DATE OF BIRTH - '+dob,'জন্মতারিখ DDMMMYY ফরম্যাটে দিন, যেমন 15MAR90।',[ex]);
+  if(!/^(M|F|MI|FI|U)$/.test(gen))return err('INVALID GENDER - '+gen,'লিঙ্গ: M (পুরুষ), F (মহিলা), ইনফ্যান্ট হলে MI/FI।',[ex]);
+  const xp=parseYY(exp,false);if(!xp)return err('INVALID EXPIRY DATE - '+exp,'মেয়াদ শেষের তারিখ DDMMMYY ফরম্যাটে দিন, যেমন 20AUG31।',[ex]);
+  if(xp<=today())return err('PASSPORT EXPIRED','পাসপোর্টের মেয়াদ শেষ। নতুন পাসপোর্টের তথ্য দিন।',[ex]);
+  if(!/^[A-Z][A-Z ]*$/.test(sur)||!/^[A-Z][A-Z ]*$/.test(giv))return err('CHECK NAME IN DOCS','DOCS-এর নামে শুধু ইংরেজি অক্ষর থাকবে।',[ex]);
+  const r=parseRefs(m[3],p);if(r.err)return refErr(r,c.replace(/\/P\d+$/,''));
+  if(!r.pax){if(p.names.length>1)return err('PASSENGER ASSOCIATION REQUIRED','একাধিক যাত্রী আছে, শেষে /P + যাত্রী নম্বর দিন।',[c+'/P1']);r.pax=p.names[0].id;}
+  const nmo=p.names.find(n=>n.id===r.pax);
+  const notes=[];
+  if(gen.endsWith('I')&&!nmo.inf)return err('NO INFANT ON THIS PASSENGER','MI/FI শুধু ইনফ্যান্টের জন্য, এবং সেই অ্যাডাল্টের সাথে ইনফ্যান্ট যুক্ত থাকতে হবে।',[c.replace('-'+gen+'-','-M-')]);
+  if(!gen.endsWith('I')&&(sur!==nmo.sur||giv.split(' ')[0]!==nmo.given.split(' ')[0]))notes.push(`সতর্কতা: DOCS-এর নাম (${sur}/${giv}) আর PNR-এর নাম (${nmo.sur}/${nmo.given}) মিলছে না। এয়ারপোর্টে সমস্যা হতে পারে।`);
+  const last=p.segs[p.segs.length-1].date;if(dayDiff(last,xp)<183)notes.push('সতর্কতা: ভ্রমণের পর পাসপোর্টের মেয়াদ ৬ মাসের কম। অনেক দেশ এমন যাত্রী নেয় না।');
+  p.els.push({id:nid(),type:'SSR',code:'DOCS',al,st:'HK',text:[type,iss,num,nat,ddmmmyy(db),gen,ddmmmyy(xp),sur,giv].join('/'),pax:r.pax,seg:[]});
+  changed();emit('DOCS');showPNR();if(notes.length)tip(notes.join('<br>'));
+}
+
+/* ---- Seat map ---- */
+function cabinLayout(eq){const wide=['77W','359','788','789','388','333','773','332'].includes(eq);
+  if(wide)return{J:{rows:[1,8],cols:['A','','D','G','','K']},Y:{rows:[20,48],cols:['A','B','C','','D','E','F','G','','H','J','K']}};
+  return{J:{rows:[1,4],cols:['A','C','','D','F']},Y:{rows:[7,32],cols:['A','B','C','','D','E','F']}};}
+function taken(s,seat){const r=rng(s.al+s.fn+s.date+seat);return r()<0.42;}
+function cmdSM(cs){
+  const p=P();if(!p.segs.length)return err('NEED ITINERARY','সিট ম্যাপ দেখতে আগে ফ্লাইট সেল করুন।',['AN'+D(30)+'DACDXB']);
+  const mp=numMap(p);const n=cs.slice(2);let s=p.segs[0];
+  if(n){s=p.segs.find(x=>mp[x.id]===+n);if(!s)return err('CHECK SEGMENT NUMBER',`SM এর পরে ফ্লাইট সেগমেন্টের নম্বর দিন। সেগমেন্ট: ${p.segs.map(x=>mp[x.id]).join(', ')}।`,['SM'+mp[p.segs[0].id]]);}
+  state.smSeg=s.id;
+  const lay=cabinLayout(s.eq)[s.cabin];const mine=p.els.filter(e=>e.code==='RQST'&&e.seg.includes(s.id)).map(e=>e.seat);
+  const L=[`SM ${s.al}${s.fn} ${s.cls} ${ddmmm(s.date)} ${s.from}${s.to}  ${s.eq} ${EQ[s.eq]||''}`,`CABIN ${s.cabin==='J'?'BUSINESS':'ECONOMY'}   . FREE   X OCCUPIED   * THIS PNR   E EXIT ROW`,''];
+  L.push('      '+lay.cols.map(c=>c||' ').join(' '));
+  for(let r=lay.rows[0];r<=lay.rows[1];r++){
+    if(s.cabin==='Y'&&(r===13))continue;
+    const exit=s.cabin==='Y'&&(r===lay.rows[0]||r===lay.rows[0]+7);
+    L.push(String(r).padStart(4)+'  '+lay.cols.map(c=>{if(!c)return' ';const id=r+c;return mine.includes(id)?'*':taken(s,id)?'X':'.';}).join(' ')+(exit?'  E':''));
+  }
+  emit('SM');out(L.join('\n'));
+  tip('সিট নিতে: ST/ + সারি ও কলাম + /P যাত্রী + /S সেগমেন্ট।',['ST/'+(lay.rows[0]+2)+'A/P1/S'+mp[s.id]]);
+}
+function cmdST(cs){
+  const p=P();const m=/^ST\/(\d{1,2})([A-K])((?:\/[PS]\d+)*)$/.exec(cs);
+  if(!m)return err('CHECK FORMAT','সিট রিকোয়েস্ট: ST/ + সিট (যেমন 23A) + /P যাত্রী + /S সেগমেন্ট।',['ST/23A/P1/S2']);
+  if(!p.segs.length||!p.names.length)return err('NEED NAME AND ITINERARY','সিট নিতে নাম আর ফ্লাইট দুটোই লাগবে।',['NM1KHAN/IQBAL MR']);
+  const r=parseRefs(m[3],p);if(r.err)return refErr(r,'ST/'+m[1]+m[2]);
+  const mp=numMap(p);
+  if(!r.pax){if(p.names.length>1)return err('PASSENGER ASSOCIATION REQUIRED','একাধিক যাত্রী আছে। /P দিয়ে যাত্রী বলুন।',[cs+'/P1']);r.pax=p.names[0].id;}
+  let sid=r.seg[0];if(!sid){if(p.segs.length>1&&!state.smSeg)return err('SEGMENT ASSOCIATION REQUIRED','একাধিক ফ্লাইট আছে। /S দিয়ে সেগমেন্ট বলুন।',[cs+'/S'+mp[p.segs[0].id]]);sid=state.smSeg&&p.segs.some(s=>s.id===state.smSeg)?state.smSeg:p.segs[0].id;}
+  const s=p.segs.find(x=>x.id===sid);const lay=cabinLayout(s.eq)[s.cabin];const seat=m[1]+m[2];const row=+m[1];
+  if(!lay.cols.includes(m[2])||row<lay.rows[0]||row>lay.rows[1]){const other=cabinLayout(s.eq)[s.cabin==='J'?'Y':'J'];const inOther=other.cols.includes(m[2])&&row>=other.rows[0]&&row<=other.rows[1];return err('SEAT NOT IN BOOKED CABIN - '+seat,inOther?`এই সিট ${s.cabin==='J'?'ইকোনমি':'বিজনেস'} কেবিনে, কিন্তু বুকিং ক্লাস ${s.cls} (${s.cabin==='J'?'বিজনেস':'ইকোনমি'})।`:'এই সিট এই এয়ারক্রাফটে নেই। SM দিয়ে ম্যাপ দেখুন।',['SM'+mp[s.id]]);}
+  if(taken(s,seat))return err('SEAT OCCUPIED - '+seat,'এই সিটে অন্য যাত্রী আছে (X)। ফাঁকা (.) সিট বেছে নিন।',['SM'+mp[s.id]]);
+  if(p.els.some(e=>e.code==='RQST'&&e.seg.includes(sid)&&e.seat===seat))return err('SEAT ALREADY ASSIGNED','এই সিট এই PNR-এর অন্য যাত্রীকে দেওয়া আছে।',['SM'+mp[s.id]]);
+  const nmo=p.names.find(n=>n.id===r.pax);
+  const exitRow=s.cabin==='Y'&&(row===lay.rows[0]||row===lay.rows[0]+7);
+  if(exitRow&&(nmo.type==='CHD'||nmo.inf))return err('EXIT ROW NOT PERMITTED','এক্সিট রো-তে চাইল্ড বা ইনফ্যান্টসহ যাত্রী বসতে পারে না।',['SM'+mp[s.id]]);
+  p.els=p.els.filter(e=>!(e.code==='RQST'&&e.pax===r.pax&&e.seg.includes(sid)));
+  p.els.push({id:nid(),type:'SSR',code:'RQST',al:s.al,st:'HK',seat,text:`${s.from}${s.to}/${seat}N`,pax:r.pax,seg:[sid]});
+  changed();emit('ST');showPNR();
+}
+
+/* ---- End / Ignore / Retrieve ---- */
+function cmdET(cs){
+  const p=P();
+  if(!hasContent(p))return err('NO TRANSACTION PRESENT','সেভ করার মতো কোনো PNR নেই।',['AN'+D(30)+'DACDXB']);
+  if(!p.dirty){if(cs.startsWith('ER')){emit('ER');return showPNR();}out(`END OF TRANSACTION COMPLETE - ${p.loc}`,'okm');state.pnr=newPnr();return;}
+  if(!p.segs.length)return err('NEED ITINERARY','PNR সেভ করতে কমপক্ষে একটি ফ্লাইট সেগমেন্ট লাগবে।',['AN'+D(30)+'DACDXB']);
+  if(!p.names.length)return err('NEED NAME IN PNR','যাত্রীর নাম ছাড়া PNR সেভ হয় না।',['NM1KHAN/IQBAL MR']);
+  const seatsNeed=p.names.length;const bad=p.segs.find(s=>s.n!==seatsNeed&&s.status!=='XX');
+  if(bad)return err('CHECK NUMBER OF NAMES/SEATS',`যাত্রী ${seatsNeed} জন (ইনফ্যান্ট সিট নেয় না) কিন্তু ${bad.al}${bad.fn} এ ${bad.n}টি সিট। সেগমেন্ট বাতিল করে সঠিক সংখ্যায় আবার সেল করুন, অথবা নাম যোগ/বাতিল করুন।`,['XE'+numMap(p)[bad.id],'SS'+seatsNeed+'Y1']);
+  if(!p.els.some(e=>e.type==='AP'))return err('NEED PHONE NUMBER IN PNR','PNR-এ কমপক্ষে একটি যোগাযোগ (AP) এলিমেন্ট বাধ্যতামূলক।',['AP DMM 0501234567']);
+  if(!p.els.some(e=>e.type==='TK'))return err('NEED TICKETING ARRANGEMENT','TK এলিমেন্ট বাধ্যতামূলক: TKOK অথবা TKTL।',['TKOK','TKTL'+D(2)+'/1200']);
+  if(!p.rf)return err('NEED RECEIVED FROM - USE RF ENTRY','প্রতিবার PNR সেভ বা পরিবর্তনের আগে RF দিতে হয় (কে পরিবর্তন চেয়েছেন)।',['RF'+(state.agent.slice(4)||'AGENT')]);
+  const isNew=!p.loc;
+  if(isNew){p.loc=newLoc();p.created=today();p.time=utcNow();}
+  p.segs.forEach(s=>{if(s.status==='DK')s.status='HK';if(!s.aloc)s.aloc=newLoc();});
+  p.els.forEach(e=>{if(e.type==='SSR'&&e.st==='NN')e.st='HK';});
+  p.hist.push({d:ddmmmyy(today()),t:utcNow(),rf:p.rf,ag:state.agent,act:isNew?'PNR CREATED':'PNR MODIFIED'});
+  p.rf='';p.dirty=false;state.db[p.loc]=clone(p);
+  const ev=cs.startsWith('ER')?'ER':'ET';emit(ev);emit('SAVE');
+  if(state.qcur!=null)out('QUEUE MODE ACTIVE - USE QN FOR NEXT','okm');
+  if(ev==='ER'){out(`END OF TRANSACTION COMPLETE - ${p.loc}`,'okm');showPNR();}
+  else{out(`END OF TRANSACTION COMPLETE - ${p.loc}`,'okm');state.pnr=newPnr();tip(`PNR সেভ হয়েছে। রেকর্ড লোকেটর <b>${p.loc}</b>। আবার খুলতে RT + লোকেটর।`,['RT'+p.loc]);}
+}
+function cmdIG(){const p=P();if(!hasContent(p))return err('NO TRANSACTION PRESENT','ইগনোর করার মতো কিছু নেই।',[]);out('IGNORED'+(p.loc?' - '+p.loc:''),'okm');state.pnr=newPnr();state.qcur=null;emit('IG');}
+function cmdIR(){const p=P();if(!p.loc)return err('NO RECORD LOCATOR','IR শুধু সেভ করা PNR-এ কাজ করে (পরিবর্তন বাদ দিয়ে আগের অবস্থায় ফেরে)। নতুন PNR বাদ দিতে IG দিন।',['IG']);state.pnr=clone(state.db[p.loc]);out('IGNORED AND REDISPLAYED','okm');emit('IG');showPNR();}
+function loadPnr(loc){if(P().dirty&&hasContent(P())&&P().loc!==loc){err('FINISH OR IGNORE','বর্তমান PNR-এ সেভ না করা পরিবর্তন আছে। আগে ET/ER (সেভ) বা IG (বাতিল) দিন।',['ER','IG']);return false;}state.pnr=clone(state.db[loc]);return true;}
+function cmdRT(cs){
+  const p=P();let m;
+  if(cs==='RT'){if(!hasContent(p))return err('NO ACTIVE PNR','স্ক্রিনে কোনো PNR খোলা নেই। লোকেটর বা নাম দিয়ে খুঁজুন।',Object.keys(state.db).length?['RT'+Object.keys(state.db).slice(-1)[0],'RT/'+state.db[Object.keys(state.db).slice(-1)[0]].names[0].sur]:['AN'+D(30)+'DACDXB']);emit('RTD');return showPNR();}
+  if(cs==='RTN'){const mp=numMap(p);return out(p.names.map(n=>`${mp[n.id]}.${nameStr(n)}`).join('\n')||'NO NAMES');}
+  if(cs==='RTA'){return out(items(p).filter(i=>i.k==='seg').map(i=>String(i.n).padStart(3)+'  '+segStr(i.r,p)).join('\n')||'NO ITINERARY');}
+  if((m=/^RT(\d{1,2})$/.exec(cs))){
+    if(!state.rtList)return err('NO LIST DISPLAYED','RT + সংখ্যা দিয়ে আগের নামের তালিকা থেকে PNR বাছাই হয়। আগে RT/সারনেম দিন।',['RT/KHAN']);
+    const loc=state.rtList[+m[1]-1];if(!loc)return err('CHECK LINE NUMBER','তালিকায় এই নম্বর নেই।',['RT1']);
+    if(!loadPnr(loc))return;emit('RT');return showPNR();}
+  if((m=/^RT([A-Z0-9]{6})$/.exec(cs))){
+    if(!state.db[m[1]])return err('INVALID RECORD LOCATOR','এই লোকেটরে কোনো PNR নেই। নাম দিয়ে খুঁজতে RT/সারনেম দিন।',['RT/'+(Object.values(state.db)[0]?.names[0]?.sur||'KHAN')]);
+    if(!loadPnr(m[1]))return;emit('RT');return showPNR();}
+  if((m=/^RT\/([A-Z\-']+)(?:\/([A-Z ]+))?$/.exec(cs))){
+    const res=Object.values(state.db).filter(x=>x.names.some(n=>n.sur.startsWith(m[1])&&(!m[2]||n.given.startsWith(m[2]))));
+    if(!res.length)return err('NO NAME','এই নামে কোনো সেভ করা PNR নেই। সেভ (ET) না করা PNR খোঁজা যায় না।',Object.values(state.db).slice(0,2).map(x=>'RT/'+x.names[0].sur));
+    if(res.length===1){if(!loadPnr(res[0].loc))return;emit('RT');return showPNR();}
+    state.rtList=res.map(x=>x.loc);
+    out(res.map((x,i)=>{const n=x.names[0],s=x.segs[0];return `${String(i+1).padStart(2)} ${(n.sur+'/'+n.given+' '+n.title).padEnd(24)} ${String(x.names.length).padStart(2)} ${s?s.al+s.fn.padStart(5)+' '+s.cls+' '+ddmmm(s.date)+' '+s.from+s.to:'NO ITIN'}  ${x.loc}`;}).join('\n'));
+    return tip('তালিকা থেকে PNR খুলতে RT + লাইন নম্বর।',['RT1']);
+  }
+  return err('CHECK FORMAT','রিট্রিভ ফরম্যাট: RT (বর্তমান), RT + লোকেটর, RT/ + সারনেম।',['RT','RT/KHAN']);
+}
+function cmdRH(){const p=P();if(!p.loc)return err('NO HISTORY','হিস্ট্রি শুধু সেভ করা PNR-এ থাকে।',['RT/KHAN']);emit('RH');out(`RP/${OFFICE}/ ${p.loc}\n`+p.hist.map((h,i)=>`${String(i).padStart(3,'0')} ${OFFICE} ${h.ag.slice(4)}/SU ${h.d}/${h.t}Z  RF-${h.rf}\n    ${h.act}`).join('\n'));}
+function cmdXE(cs){
+  const p=P();const m=/^XE([\d,\-]+)$/.exec(cs);
+  if(!m)return err('CHECK FORMAT','বাতিল করতে XE + এলিমেন্ট নম্বর (একাধিক: XE3,5 বা পরপর: XE3-5)।',['XE4','XE3-5']);
+  if(!hasContent(p))return err('NO ACTIVE PNR','আগে PNR খুলুন।',['RT/KHAN']);
+  const nums=expandNums(m[1]);const it=items(p);const max=it.length;
+  if(nums.some(n=>isNaN(n)||n<1||n>max))return err('CHECK ELEMENT NUMBER',`এই PNR-এ এলিমেন্ট নম্বর 1 থেকে ${max}। RT দিয়ে নম্বর মিলিয়ে নিন।`,['RT']);
+  const del=it.filter(i=>nums.includes(i.n));
+  if(del.some(i=>i.k==='el'&&i.r.type==='FA'))return err('FA ELEMENT CANNOT BE CANCELLED','টিকেটের FA লাইন XE দিয়ে মোছা যায় না। টিকেট বাতিল করতে TWX (ভয়েড) ব্যবহার করুন।',['TWX'+del.find(i=>i.r.type==='FA').n]);
+  if(del.some(i=>i.k==='name')&&p.tickets.some(t=>t.status==='OK'))return err('NAME HAS TICKET - VOID FIRST','টিকেট ইস্যু হওয়া যাত্রীর নাম বাতিলের আগে টিকেট ভয়েড করুন।',['TWD']);
+  const ids=new Set(del.map(i=>i.r.id));
+  if(del.some(i=>i.k==='seg')&&p.tickets.some(t=>t.status==='OK'))out('WARNING: TICKETED SEGMENT CANCELLED','err');
+  p.names=p.names.filter(n=>!ids.has(n.id));p.segs=p.segs.filter(s=>!ids.has(s.id));
+  p.els=p.els.filter(e=>!ids.has(e.id)&&!(e.pax&&ids.has(e.pax))&&!(e.seg&&e.seg.length&&e.seg.every(sid=>ids.has(sid))));
+  if(del.some(i=>i.k!=='el')&&p.tst.length){p.tst=[];out('WARNING: TST DELETED','err');}
+  changed();emit('XE');showPNR();
+}
+function cmdXI(){const p=P();if(!p.segs.length)return err('NO ITINERARY','বাতিল করার মতো কোনো সেগমেন্ট নেই।',[]);p.segs=[];p.els=p.els.filter(e=>!(e.seg&&e.seg.length)&&e.type!=='OSI');p.tst=[];changed();emit('XI');showPNR();tip('পুরো ইটিনেরারি বাতিল হয়েছে। সেভ করতে RF + ET (অথবা ফেরত পেতে IR/IG)।',['RFIQBAL','IR']);}
+
+/* ---- Fares ---- */
+function priceBuild(p,ptc,paxIds){
+  const segs=p.segs;const c=AP[segs[0].from][2];const [cur,roe,dec]=curFor(c);
+  const rt=segs[0].from===segs[segs.length-1].to&&segs.length>1;
+  const f=ptc==='ADT'?1:ptc==='CHD'?0.75:0.1;
+  let nuc=0;const fbs=[];const comps=[];
+  segs.forEach(s=>{let v=fareUSD(s,s.cls)*(rt?0.9:1)*f;v=Math.round(v*100)/100;nuc+=v;fbs.push(s.cls+(rt?'RT':'OW')+(AP[s.from][2])+(ptc==='CHD'?'/CH':ptc==='INF'?'/IN':''));comps.push(`${s.al} ${s.to}${v.toFixed(2)}`);});
+  const taxes={};const add=(k,v)=>{taxes[k]=(taxes[k]||0)+v;};
+  segs.forEach(s=>{const cc=AP[s.from][2];const base={BD:11,SA:14,AE:20,IN:9,GB:s.cabin==='J'?190:110,QA:12,US:38}[cc]??16;add(cc,ptc==='INF'?(cc==='GB'?0:base*0.2):base);
+    if(ptc!=='INF'){add('YQ',Math.round((s.dist*0.011+28)*(s.cabin==='J'?1.6:1)));add('YR',8);}});
+  const loc=v=>dec===0?Math.round(v*roe):Math.round(v*roe*10**dec)/10**dec;
+  const base=loc(nuc);const tx=Object.entries(taxes).map(([k,v])=>[k,loc(v)]);const total=base+tx.reduce((a,b)=>a+b[1],0);
+  const fc=`${ddmmmyy(segs[0].date)}${segs[0].from} ${comps.join(' ')}NUC${nuc.toFixed(2)}END ROE${roe.toFixed(6)}`;
+  const bags=segs.map(s=>ptc==='INF'?'10K':s.cabin==='J'?'40K':['T','V','X','Q'].includes(s.cls)?'20K':'30K');
+  const lastTkt=[addDays(today(),3),addDays(segs[0].date,-1)].filter(d=>d>=today()).sort()[0]||today();
+  return{ptc,pax:paxIds,cur,dec,base,tax:tx,total:Number(total.toFixed(dec)),fc,fbs,bags,lastTkt,segIds:segs.map(s=>s.id)};
+}
+function priceAll(p,onlyPax){
+  const groups=[];const ad=p.names.filter(n=>n.type==='ADT'&&(!onlyPax||onlyPax.includes(n.id))),ch=p.names.filter(n=>n.type==='CHD'&&(!onlyPax||onlyPax.includes(n.id))),inf=ad.filter(n=>n.inf);
+  if(ad.length)groups.push(priceBuild(p,'ADT',ad.map(n=>n.id)));
+  if(ch.length)groups.push(priceBuild(p,'CHD',ch.map(n=>n.id)));
+  if(inf.length)groups.push(priceBuild(p,'INF',inf.map(n=>n.id)));
+  groups.forEach((g,i)=>g.n=i+1);return groups;
+}
+function tstText(t,p){
+  const mp=numMap(p);const segs=t.segIds.map(id=>p.segs.find(s=>s.id===id)).filter(Boolean);const L=[];
+  L.push(`${String(t.n).padStart(2,'0')} `+t.pax.map(id=>{const n=p.names.find(x=>x.id===id);return n?(t.ptc==='INF'?`${n.inf.sur}/${n.inf.given} (INF)`:`${n.sur}/${n.given} ${n.title}`):'';}).join(' ')+`   ${t.ptc}  P${t.pax.map(id=>mp[id]).join(',')}`);
+  L.push(`LAST TKT DTE ${ddmmmyy(t.lastTkt)} - SEE ADV PURCHASE`);
+  L.push('------------------------------------------------------------');
+  L.push('     AL FLGT  BK   DATE  TIME  FARE BASIS      NVB  NVA   BG');
+  if(segs[0])L.push(' '+segs[0].from);
+  segs.forEach((s,i)=>L.push(` ${s.to} ${s.al.padEnd(2)} ${s.fn.padStart(5)} ${s.cls}    ${ddmmm(s.date)} ${s.dep}  ${t.fbs[i].padEnd(15)} ${ddmmm(s.date)} ${ddmmm(s.date)} ${t.bags[i]}`));
+  L.push(`${t.cur.padEnd(3)} ${money(t.base,t.dec).padStart(11)}      ${t.fc}`);
+  t.tax.forEach(([k,v])=>L.push(`${t.cur.padEnd(3)} ${money(v,t.dec).padStart(11)}-${k}`));
+  L.push(`${t.cur.padEnd(3)} ${money(t.total,t.dec).padStart(11)}   TOTAL PER PASSENGER`);
+  return L.join('\n');
+}
+function tstSummary(ts,p){
+  const mp=numMap(p);const L=['   PASSENGER                PTC  NP       FARE        TAX   PER PSGR      TOTAL'];let sum=0;
+  ts.forEach(t=>{const n=p.names.find(x=>x.id===t.pax[0]);const nm=t.ptc==='INF'?`${n.inf.sur}/${n.inf.given}`:`${n.sur}/${n.given} ${n.title}`;const tx=t.tax.reduce((a,b)=>a+b[1],0);const tot=t.total*t.pax.length;sum+=tot;
+    L.push(`${String(t.n).padStart(2,'0')} ${nm.slice(0,24).padEnd(24)} ${t.ptc}  ${String(t.pax.length).padStart(2)} ${money(t.base,t.dec).padStart(10)} ${money(tx,t.dec).padStart(10)} ${money(t.total,t.dec).padStart(10)} ${money(tot,t.dec).padStart(10)}`);});
+  L.push(`${''.padStart(52)}TOTALS ${ts[0].cur} ${money(sum,ts[0].dec).padStart(10)}`);
+  return L.join('\n');
+}
+function priceGuard(){
+  const p=P();
+  if(!p.segs.length)return err('NO ITINERARY','প্রাইস করতে PNR-এ ফ্লাইট লাগবে।',['AN'+D(30)+'DACDXB']);
+  if(!p.names.length)return err('NEED NAME IN PNR','প্রাইসিংয়ের জন্য যাত্রীর নাম (ADT/CHD/INF ধরন বুঝতে) লাগবে।',['NM1KHAN/IQBAL MR']);
+  return true;
+}
+function cmdFX(cs){
+  const m=/^FX([XPBA])((?:\/P[\d,\-]+)?)$/.exec(cs);
+  if(!m)return err('CHECK FORMAT','প্রাইসিং: FXX (শুধু দেখা), FXP (দাম + TST সেভ), FXB (সবচেয়ে কম ভাড়ায় রিবুক), FXA (কম ভাড়ার অপশন)। নির্দিষ্ট যাত্রী: /P1।',['FXP','FXX','FXP/P1']);
+  if(priceGuard()!==true)return;
+  const p=P();let only=null;
+  if(m[2]){const mp=numMap(p);only=[];for(const n of expandNums(m[2].slice(2))){const nm=p.names.find(x=>mp[x.id]===n);if(!nm)return err('CHECK PASSENGER NUMBER','এই নম্বরে কোনো যাত্রী নেই।',['FXP']);only.push(nm.id);}}
+  const mode=m[1];
+  if(mode==='A'||mode==='B'){
+    const changes=[];
+    p.segs.forEach(s=>{const open=classesFor(s.al).filter(k=>s.seats[k]+(k===s.cls?s.n:0)>=s.n&&BIZ.includes(k)===BIZ.includes(s.cls));const best=open.sort((a,b)=>MULT[a]-MULT[b])[0];if(best&&MULT[best]<MULT[s.cls])changes.push([s,best]);});
+    if(!changes.length){out('NO LOWER FARE AVAILABLE - CURRENT BOOKING IS LOWEST','okm');if(mode==='A')return;}
+    if(mode==='A'){const mp=numMap(p);out('LOWEST AVAILABLE FARE OPTIONS\n'+changes.map(([s,b])=>`SEG ${mp[s.id]}  ${s.al}${s.fn} ${s.from}${s.to}  BOOKED ${s.cls}  LOWEST ${b}`).join('\n'));emit('FXA');return tip('রিবুক করে দাম নিতে FXB, অথবা হাতে SB দিয়ে ক্লাস বদলান।',['FXB'].concat(changes.map(([s,b])=>'SB'+b+mp[s.id])));}
+    changes.forEach(([s,b])=>{s.seats[s.cls]+=s.n;s.seats[b]-=s.n;s.cls=b;s.status='DK';});
+    if(changes.length){out('REBOOKED: '+changes.map(([s,b])=>`${s.al}${s.fn} TO ${b}`).join(', '),'okm');changed();}
+  }
+  const ts=priceAll(p,only);if(!ts.length)return err('NO PASSENGER TO PRICE','নির্বাচিত যাত্রী নেই।',['FXP']);
+  if(ts.length===1)out(cs+'\n'+tstText(ts[0],p));else{out(cs+'\n'+tstSummary(ts,p));}
+  if(mode==='X'){emit('FXX');out('*INFORMATIVE PRICING ONLY - NO TST CREATED*','okm');return tip('এটা শুধু দাম দেখা। TST তৈরি করে টিকেটের জন্য রাখতে FXP দিন।',['FXP']);}
+  p.tst=ts;changed();emit('FXP');if(mode==='B')emit('FXB');
+  out(ts.length>1?`TST RECORDED - ${ts.length} TST - USE TQT/T1 FOR DETAILS`:'TST RECORDED','okm');
+  if(!p.els.some(e=>e.type==='FP'))tip('দাম সেভ (TST) হয়েছে। এবার পেমেন্ট (FP), তারপর RF ও ER, শেষে TTP।',['FPCASH','TQT']);
+}
+function cmdTQT(cs){
+  const p=P();const m=/^TQT(?:\/T(\d+))?$/.exec(cs);if(!m)return err('CHECK FORMAT','TST দেখতে TQT, নির্দিষ্টটি দেখতে TQT/T1।',['TQT','TQT/T1']);
+  if(!p.tst.length)return err('NO TST','এই PNR-এ কোনো TST নেই। FXP দিয়ে প্রাইস সেভ করুন।',['FXP']);
+  emit('TQT');
+  if(m[1]){const t=p.tst.find(x=>x.n===+m[1]);if(!t)return err('CHECK TST NUMBER','এই নম্বরে TST নেই।',['TQT']);return out(tstText(t,p));}
+  if(p.tst.length===1)return out(tstText(p.tst[0],p));
+  out('TST  PTC  PAX   STATUS\n'+p.tst.map(t=>`T${t.n}   ${t.ptc}  ${t.pax.length}     ${t.ticketed?'TICKETED':'NOT TICKETED'}`).join('\n'));tip('বিস্তারিত দেখতে TQT/T + নম্বর।',['TQT/T1']);
+}
+function cmdTTE(cs){const p=P();const m=/^TTE\/(ALL|T(\d+))$/.exec(cs);if(!m)return err('CHECK FORMAT','TST মুছতে TTE/ALL বা TTE/T1।',['TTE/ALL']);if(!p.tst.length)return err('NO TST','মোছার মতো TST নেই।',[]);if(m[1]==='ALL')p.tst=[];else p.tst=p.tst.filter(t=>t.n!==+m[2]);changed();out('TST DELETED','okm');emit('TTE');}
+function cmdFQD(cs){
+  const m=/^FQD(\d{1,2}[A-Z]{3})?([A-Z]{3})([A-Z]{3})(?:\/A([A-Z0-9]{2}))?(?:\/D(\d{1,2}[A-Z]{3}))?$/.exec(cs);
+  if(!m)return err('CHECK FORMAT','ফেয়ার ডিসপ্লে: FQD + FROM + TO + /A এয়ারলাইন (+ /D তারিখ)।',['FQDDACDXB/AEK','FQDDMMDAC/ABG']);
+  if(!AP[m[2]]||!AP[m[3]])return err('CHECK CITY CODE','শহরের কোড ভুল।',['FQDDACDXB/AEK']);
+  const date=parseDate(m[5]||m[1]||'')||addDays(today(),30);
+  let al=m[4];if(!al){const o=genAvail(m[2],m[3],date,null)[0];if(!o)return err('NO FARES','এই রুটে ভাড়া পাওয়া যায়নি।',[]);al=o.legs[0].al;}
+  if(!AL[al])return err('CHECK AIRLINE CODE','এয়ারলাইন কোড ভুল।',['FQDDACDXB/AEK']);
+  const d=dist(m[2],m[3]);const [cur,roe,dec]=curFor(AP[m[2]][2]);const fake={al,dist:d};const L=[];
+  L.push(`FQD${m[2]}${m[3]}/A${al}`,`ROE ${roe.toFixed(6)} UP TO 100.00 USD`,`${ddmmmyy(date)}**${ddmmmyy(date)}/${al} ${m[2]}${m[3]}/NSP;EH/TPM ${String(Math.round(d*0.621)).padStart(5)}`,'LN FARE BASIS     OW '+cur.padEnd(4)+'       RT   B  PEN  AP  MIN  MAX  R');
+  const cls=classesFor(al).slice().reverse();
+  cls.forEach((c,i)=>{const ow=fareUSD(fake,c)*roe,rt=ow*1.8;L.push(`${String(i+1).padStart(2,'0')} ${(c+'OW'+AP[m[2]][2]).padEnd(13)} ${money(dec?ow:Math.round(ow),dec).padStart(9)} ${money(dec?rt:Math.round(rt),dec).padStart(11)}   ${c}  ${BIZ.includes(c)?' - ':'+  '}  ${['T','V','X','Q'].includes(c)?'14':' -'}  ${['T','V','X'].includes(c)?'SU ':' - '}  ${['T','V','X'].includes(c)?'3M':'12M'}  R`);});
+  state.fqd={from:m[2],to:m[3],al,cls,cur};emit('FQD');out(L.join('\n'));
+  tip('কোনো ভাড়ার নিয়ম (পেনাল্টি, মেয়াদ) দেখতে FQN + লাইন নম্বর।',['FQN1','FQN'+cls.length]);
+}
+function cmdFQN(cs){const m=/^FQN(\d+)$/.exec(cs);if(!state.fqd)return err('NO FARE DISPLAY','আগে FQD দিয়ে ভাড়ার তালিকা দেখুন।',['FQDDACDXB/AEK']);if(!m)return err('CHECK FORMAT','FQN + লাইন নম্বর।',['FQN1']);const c=state.fqd.cls[+m[1]-1];if(!c)return err('CHECK LINE NUMBER','এই লাইন নেই।',['FQN1']);const low=['T','V','X','Q'].includes(c),biz=BIZ.includes(c);emit('FQN');
+  out(`FQN${m[1]}  ${c}OW${AP[state.fqd.from][2]}  ${state.fqd.al}  ${state.fqd.from}${state.fqd.to}\nPE.PENALTIES\n   CHANGES  ${low?'CHARGE USD 150.00':biz?'FREE':'CHARGE USD 75.00'}\n   REFUND   ${low?'NON-REFUNDABLE':biz?'FREE BEFORE DEPARTURE':'CHARGE USD 100.00'}\n   NO-SHOW  USD 100.00\nAP.ADVANCE RES/TKT\n   ${low?'RESERVE 14 DAYS BEFORE DEPARTURE':'NONE'}\nMX.MAX STAY\n   ${low?'3 MONTHS':'12 MONTHS'}\nBG.BAGGAGE\n   ${biz?'40K':low?'20K':'30K'}`);}
+function cmdFP(cs){
+  const p=P();let text;let m;
+  if(/^FP(CASH|CA)$/.test(cs))text='CASH';else if(/^FP(CHEQUE|CHECK|CHQ)$/.test(cs))text='CHEQUE';
+  else if((m=/^FPCC([A-Z]{2})(\d{12,19})\/(\d{2})(\d{2})$/.exec(cs))){
+    if(!['VI','CA','MC','AX','DC'].includes(m[1]))return err('INVALID CARD VENDOR - '+m[1],'কার্ড কোড: VI (ভিসা), CA (মাস্টারকার্ড), AX (অ্যামেক্স)।',['FPCCVI4111111111111111/1229']);
+    if(!luhn(m[2]))return err('CHECK CREDIT CARD NUMBER','কার্ড নম্বর সঠিক নয় (চেক ডিজিট মেলেনি)। প্র্যাকটিসে টেস্ট নম্বর ব্যবহার করুন।',['FPCCVI4111111111111111/1229']);
+    if(+m[3]<1||+m[3]>12)return err('INVALID EXPIRY DATE','মেয়াদ MMYY ফরম্যাটে, যেমন 1229।',['FPCCVI4111111111111111/1229']);
+    const exp=new Date(2000+ +m[4],+m[3],0);if(exp<new Date())return err('CARD EXPIRED','কার্ডের মেয়াদ শেষ।',['FPCCVI4111111111111111/1229']);
+    text=`CC${m[1]}${'X'.repeat(m[2].length-4)}${m[2].slice(-4)}/${m[3]}${m[4]}`;
+  } else {
+    if(/^FPCC/.test(cs))return err('CHECK FORMAT','কার্ড পেমেন্ট: FPCC + কার্ড কোড + নম্বর + / + মেয়াদ MMYY। শুধু টেস্ট নম্বর দিন।',['FPCCVI4111111111111111/1229']);
+    return err('CHECK FORM OF PAYMENT','পেমেন্ট ফরম্যাট: FPCASH, FPCHEQUE বা FPCC...।',['FPCASH','FPCHEQUE']);
+  }
+  if(!hasContent(p))return err('NO ACTIVE PNR','আগে PNR খুলুন।',['RT/KHAN']);
+  if(p.els.some(e=>e.type==='FP'))return err('FP ELEMENT ALREADY EXISTS','একটি FP আছে। বদলাতে আগে পুরনো FP লাইন XE দিয়ে বাতিল করুন।',['XE'+numMap(p)[p.els.find(e=>e.type==='FP').id]]);
+  p.els.push({id:nid(),type:'FP',text});changed();emit('FP');showPNR();
+}
+function cmdFM(cs){const p=P();const m=/^FM(\d{1,2}(?:\.\d{1,2})?)$/.exec(cs);if(!m)return err('CHECK FORMAT','কমিশন: FM + শতাংশ, যেমন FM0 বা FM5।',['FM0','FM5']);if(+m[1]>25)return err('COMMISSION TOO HIGH','কমিশন ২৫% এর বেশি হতে পারে না।',['FM5']);if(!hasContent(p))return err('NO ACTIVE PNR','আগে PNR খুলুন।',[]);p.els=p.els.filter(e=>e.type!=='FM');p.els.push({id:nid(),type:'FM',text:m[1]});changed();emit('FM');showPNR();}
+function cmdFV(cs){const p=P();const m=/^FV([A-Z0-9]{2})$/.exec(cs);if(!m)return err('CHECK FORMAT','ভ্যালিডেটিং ক্যারিয়ার: FV + ২ অক্ষরের এয়ারলাইন কোড।',['FV'+(p.segs[0]?.al||'EK')]);if(!AL[m[1]])return err('CHECK AIRLINE CODE','এয়ারলাইন কোড ভুল।',['FV'+(p.segs[0]?.al||'EK')]);if(p.segs.length&&!p.segs.some(s=>s.al===m[1]))return err('VALIDATING CARRIER NOT IN ITINERARY','ভ্যালিডেটিং ক্যারিয়ার ইটিনেরারির কোনো এয়ারলাইন হতে হবে।',['FV'+p.segs[0].al]);p.els=p.els.filter(e=>e.type!=='FV');p.els.push({id:nid(),type:'FV',text:m[1]});changed();emit('FV');showPNR();}
+
+/* ---- Ticketing ---- */
+function cmdTTP(cs){
+  const p=P();
+  if(!/^TTP(\/(RT|ET|T\d+))*$/.test(cs))return err('CHECK FORMAT','টিকেট ইস্যু: TTP অথবা TTP/RT (ইস্যুর পর PNR দেখাবে)।',['TTP/RT','TTP']);
+  if(!hasContent(p))return err('NO ACTIVE PNR','টিকেট ইস্যুর জন্য আগে PNR খুলুন।',['RT/KHAN']);
+  if(!p.segs.length)return err('NEED ITINERARY','ফ্লাইট সেগমেন্ট ছাড়া টিকেট হয় না।',[]);
+  if(!p.tst.length)return err('NEED TST - PRICE PNR WITH FXP','টিকেট ইস্যুর আগে FXP দিয়ে দাম সেভ (TST) করতে হবে।',['FXP']);
+  if(!p.els.some(e=>e.type==='FP'))return err('NEED FORM OF PAYMENT','পেমেন্ট (FP) এলিমেন্ট দিন।',['FPCASH']);
+  if(p.dirty||!p.loc)return err('END TRANSACTION BEFORE TICKETING','টিকেট ইস্যুর আগে PNR সেভ করুন: RF দিয়ে তারপর ER।',p.rf?['ER']:['RF'+(state.agent.slice(4)||'AGENT'),'ER']);
+  if(p.segs.some(s=>s.status!=='HK'))return err('CHECK SEGMENT STATUS','সব সেগমেন্ট HK (কনফার্ম) হতে হবে।',['RT']);
+  const todo=p.tst.filter(t=>!t.ticketed);if(!todo.length)return err('TST ALREADY TICKETED','এই PNR-এর সব TST-এর টিকেট ইস্যু হয়ে গেছে। TWD দিয়ে টিকেট দেখুন।',['TWD']);
+  const fv=(p.els.find(e=>e.type==='FV')||{}).text||p.segs[0].al;
+  const notes=[];if(!p.els.some(e=>e.type==='FM'))notes.push('FM না দেওয়ায় কমিশন 0% ধরা হয়েছে।');if(!p.els.some(e=>e.type==='FV'))notes.push(`FV না দেওয়ায় প্রথম এয়ারলাইন ${fv} ভ্যালিডেটিং ক্যারিয়ার।`);
+  if(p.els.some(e=>e.type==='TK'&&/^TL/.test(e.text))){const tk=p.els.find(e=>e.type==='TK');tk.text='OK'+ddmmm(today())+'/'+OFFICE;}
+  const issued=[];
+  todo.forEach(t=>{t.pax.forEach(pid=>{const num=AL[fv][1]+String(2400000000+Math.floor(Math.random()*99999999)).padStart(10,'0');const tk={id:nid(),num,al:fv,pax:pid,inf:t.ptc==='INF',cur:t.cur,total:money(t.total,t.dec),date:today(),status:'OK',segs:t.segIds,tst:t.n};p.tickets.push(tk);p.els.push({id:nid(),type:'FA',tk:tk.id});issued.push(tk);});t.ticketed=true;});
+  p.hist.push({d:ddmmmyy(today()),t:utcNow(),rf:'TTP',ag:state.agent,act:`TICKETS ISSUED ${issued.length}`});
+  state.db[p.loc]=clone(p);emit('TTP');
+  out('OK ETICKET','okm');
+  out(issued.map(t=>`${t.num.slice(0,3)}-${t.num.slice(3)}  ${t.inf?'INF ':''}${t.cur} ${t.total}`).join('\n'));
+  if(cs.includes('/RT'))showPNR();
+  tip(['টিকেট ইস্যু সম্পন্ন। টিকেট ইমেজ দেখতে TWD।'].concat(notes).join('<br>'),['TWD','RT']);
+}
+function findTicket(cs,base){
+  const p=P();const m=new RegExp('^'+base+'(?:\\/?L)?(\\d+)?$').exec(cs);if(!m)return{bad:true};
+  const mp=numMap(p);
+  if(!m[1])return{t:p.tickets[0]};
+  const fa=p.els.find(e=>e.type==='FA'&&mp[e.id]===+m[1]);
+  return{t:fa?p.tickets.find(t=>t.id===fa.tk):null,miss:true};
+}
+function faHint(p){const mp=numMap(p);return p.els.filter(e=>e.type==='FA').map(e=>mp[e.id]);}
+function cmdTWD(cs){
+  const p=P();if(!p.tickets.length)return err('NO TICKET IN PNR','এই PNR-এ কোনো টিকেট নেই। আগে TTP দিয়ে ইস্যু করুন।',['TTP/RT']);
+  const r=findTicket(cs,'TWD');if(r.bad)return err('CHECK FORMAT','টিকেট দেখতে TWD অথবা TWD/L + FA লাইন নম্বর।',['TWD','TWD/L'+faHint(p)[0]]);
+  if(!r.t)return err('CHECK FA LINE NUMBER',`FA লাইন নম্বর দিন: ${faHint(p).join(', ')}।`,faHint(p).map(n=>'TWD/L'+n));
+  const t=r.t;const n=p.names.find(x=>x.id===t.pax);const ts=p.tst.find(x=>x.n===t.tst)||{};const segs=t.segs.map(id=>p.segs.find(s=>s.id===id)).filter(Boolean);
+  const st=t.status==='VOID'?'V':t.status==='RFND'?'R':'O';
+  const L=[`TKT-${t.num}     RCVD-${state.agent.slice(4)}/SU            RLOC-1A${p.loc}  ET${t.al}`,`OD-${segs[0]?.from||''}${segs[segs.length-1]?.to||''}  SI-  FCMI-0  POI-DMM  DOI-${ddmmmyy(t.date)}  IOI-00000000`,
+   ` 1.${t.inf?`${n.inf.sur}/${n.inf.given}`:`${n.sur}/${n.given} ${n.title}`}   ${t.inf?'INF':n.type}   ST`];
+  segs.forEach((s,i)=>{L.push(`  ${i+1} O${s.from} ${s.al} ${s.fn.padStart(4)} ${s.cls} ${ddmmm(s.date)} ${s.dep} OK ${(ts.fbs?.[i]||s.cls).padEnd(13)} ${ddmmm(s.date)}${ddmmm(s.date)} ${ts.bags?.[i]||'30K'}  ${st}`);});
+  if(segs.length)L.push(`    ${segs[segs.length-1].to}`);
+  L.push(`FARE   F ${t.cur} ${ts.base!=null?money(ts.base,ts.dec):''}`,`TOTALTAX ${t.cur} ${ts.tax?money(ts.tax.reduce((a,b)=>a+b[1],0),ts.dec):''}`,`TOTAL    ${t.cur} ${t.total}`,`/FC ${ts.fc||''}`,`FP ${(p.els.find(e=>e.type==='FP')||{}).text||''}`,`STATUS ${t.status==='OK'?'OPEN FOR USE':t.status==='VOID'?'VOIDED':'REFUNDED'}`);
+  emit('TWD');out(L.join('\n'));
+}
+function cmdTWX(cs){
+  const p=P();if(!p.tickets.length)return err('NO TICKET IN PNR','ভয়েড করার মতো টিকেট নেই।',['TTP/RT']);
+  const r=findTicket(cs,'TWX');if(r.bad||!/\d/.test(cs))return err('CHECK FORMAT','ভয়েড: TWX + FA লাইনের এলিমেন্ট নম্বর।',faHint(p).map(n=>'TWX'+n));
+  if(!r.t)return err('CHECK FA LINE NUMBER',`FA লাইন নম্বর: ${faHint(p).join(', ')}।`,faHint(p).map(n=>'TWX'+n));
+  if(r.t.status!=='OK')return err('TICKET ALREADY '+r.t.status,'এই টিকেট আগেই বাতিল/রিফান্ড হয়েছে।',['TWD']);
+  if(r.t.date!==today())return err('VOID PERIOD EXPIRED','টিকেট শুধু ইস্যুর দিনেই ভয়েড করা যায়। পরে হলে রিফান্ড (TRF) করতে হয়।',['TRF'+cs.replace(/\D/g,'')]);
+  r.t.status='VOID';const tt=p.tst.find(x=>x.n===r.t.tst);if(tt&&p.tickets.filter(x=>x.tst===tt.n).every(x=>x.status!=='OK'))tt.ticketed=false;
+  p.hist.push({d:ddmmmyy(today()),t:utcNow(),rf:'TWX',ag:state.agent,act:'TICKET VOIDED '+r.t.num});state.db[p.loc]=clone(p);emit('TWX');
+  out(`OK - VOID PROCESSED ${r.t.num.slice(0,3)}-${r.t.num.slice(3)}`,'okm');showPNR();
+}
+function cmdTRF(cs){
+  const p=P();if(!p.tickets.length)return err('NO TICKET IN PNR','রিফান্ড করার মতো টিকেট নেই।',[]);
+  const r=findTicket(cs,'TRF');if(r.bad||!/\d/.test(cs))return err('CHECK FORMAT','রিফান্ড: TRF + FA লাইনের এলিমেন্ট নম্বর।',faHint(p).map(n=>'TRF'+n));
+  if(!r.t)return err('CHECK FA LINE NUMBER',`FA লাইন নম্বর: ${faHint(p).join(', ')}।`,faHint(p).map(n=>'TRF'+n));
+  if(r.t.status!=='OK')return err('TICKET ALREADY '+r.t.status,'এই টিকেট আগেই বাতিল/রিফান্ড হয়েছে।',['TWD']);
+  const[,roe,dec]=curFor(AP[p.segs[0]?.from||'DMM'][2]);const pen=Number(money(100*roe,dec));const back=Math.max(0,+r.t.total-pen);
+  r.t.status='RFND';p.hist.push({d:ddmmmyy(today()),t:utcNow(),rf:'TRF',ag:state.agent,act:'TICKET REFUNDED '+r.t.num});state.db[p.loc]=clone(p);emit('TRF');
+  out(`REFUND RECORD CREATED ${r.t.num.slice(0,3)}-${r.t.num.slice(3)}\nTICKET TOTAL   ${r.t.cur} ${r.t.total}\nCANCEL FEE     ${r.t.cur} ${money(pen,dec)}\nREFUND AMOUNT  ${r.t.cur} ${money(back,dec)}\nOK - REFUND PROCESSED`,'okm');
+}
+
+/* ---- Queues ---- */
+function cmdQP(cs){const p=P();const m=/^QP\/(?:[A-Z0-9]{9}\/)?(\d{1,2})(?:C\d)?$/.exec(cs);if(!m)return err('CHECK FORMAT','কিউতে রাখতে QP/ + কিউ নম্বর।',['QP/8','QP/'+OFFICE+'/8']);if(!p.loc||p.dirty)return err('END TRANSACTION FIRST','শুধু সেভ করা PNR কিউতে রাখা যায়। আগে RF ও ER দিন।',['ER']);const q=+m[1];(state.queues[q]=state.queues[q]||[]);if(!state.queues[q].includes(p.loc))state.queues[q].push(p.loc);emit('QP');out(`OK - ${p.loc} PLACED ON QUEUE ${q}`,'okm');}
+function cmdQT(){const e=Object.entries(state.queues).filter(([k,v])=>v.length);emit('QT');out(`QUEUE COUNT ${OFFICE}\n QUEUE  ITEMS\n`+(e.length?e.map(([k,v])=>`  ${String(k).padStart(2)}    ${v.length}`).join('\n'):'  NO ITEMS ON QUEUE'));}
+function cmdQS(cs){const m=/^QS(\d{1,2})$/.exec(cs);if(!m)return err('CHECK FORMAT','কিউ শুরু করতে QS + কিউ নম্বর।',['QS8']);const q=state.queues[+m[1]]||[];if(!q.length)return err('QUEUE EMPTY',`কিউ ${m[1]} এ কোনো PNR নেই। QT দিয়ে কাউন্ট দেখুন।`,['QT']);if(!loadPnr(q[0]))return;state.qcur=+m[1];emit('QS');out(`QUEUE ${m[1]} - ${q.length} ITEM(S)`,'okm');showPNR();tip('পরের PNR এ যেতে QN (এটা কিউ থেকে সরবে), কিউ থেকে বের হতে QI।',['QN','QI']);}
+function cmdQN(){if(state.qcur==null)return err('NOT IN QUEUE MODE','আগে QS দিয়ে কিউ শুরু করুন।',['QS8']);if(P().dirty)return err('FINISH OR IGNORE','পরিবর্তন সেভ (ER) বা বাতিল করুন।',['ER','IG']);const q=state.queues[state.qcur];q.shift();if(!q.length){state.qcur=null;state.pnr=newPnr();return out('QUEUE CYCLE COMPLETE','okm');}state.pnr=clone(state.db[q[0]]);out(`QUEUE ${state.qcur} - ${q.length} ITEM(S)`,'okm');showPNR();}
+function cmdQI(){if(state.qcur==null)return err('NOT IN QUEUE MODE','কিউ মোড চালু নেই।',['QT']);state.qcur=null;state.pnr=newPnr();out('IGNORED - QUEUE MODE ENDED','okm');}
+
+/* =================== COMMAND CATALOG =================== */
+const CMDS=[
+ {cat:'সাইন ইন',code:'JI',fmt:'JI####AA/SU',ex:['JI1234AB/SU'],en:'SIGN IN',bn:'সাইন ইন: ৪ ডিজিটের সাইন + ২ অক্ষরের ইনিশিয়াল + /SU ডিউটি কোড।'},
+ {cat:'সাইন ইন',code:'JO',fmt:'JO',ex:['JO'],en:'SIGN OUT',bn:'সাইন আউট।'},
+ {cat:'সাইন ইন',code:'JD',fmt:'JD',ex:['JD'],en:'DISPLAY WORK AREAS',bn:'কোন এরিয়ায় সাইন ইন আছে দেখায়।'},
+ {cat:'এনকোড / ডিকোড',code:'DAC',fmt:'DAC + CITY CODE',ex:['DACDXB','DACMED'],en:'DECODE CITY/AIRPORT',bn:'৩ অক্ষরের কোড থেকে শহর/এয়ারপোর্টের নাম।'},
+ {cat:'এনকোড / ডিকোড',code:'DAN',fmt:'DAN + CITY NAME',ex:['DANJEDDAH','DANLON'],en:'ENCODE CITY NAME',bn:'শহরের নাম থেকে কোড।'},
+ {cat:'এনকোড / ডিকোড',code:'DNA',fmt:'DNA + AIRLINE CODE/NAME',ex:['DNAEK','DNA SAUDIA'],en:'DECODE/ENCODE AIRLINE',bn:'এয়ারলাইন কোড ↔ নাম, টিকেট প্রিফিক্সসহ।'},
+ {cat:'এনকোড / ডিকোড',code:'DNE',fmt:'DNE + EQUIPMENT',ex:['DNE77W'],en:'DECODE AIRCRAFT',bn:'এয়ারক্রাফট কোড ডিকোড।'},
+ {cat:'এনকোড / ডিকোড',code:'DD',fmt:'DD + CITY',ex:['DDJFK'],en:'LOCAL TIME',bn:'কোনো শহরের লোকাল টাইম।'},
+ {cat:'অ্যাভেইলেবিলিটি',code:'AN',fmt:'AN + DATE + FROM + TO (/A AIRLINE)',ex:['AN{D1}DACDXB','AN{D1}DMMDAC/ABG','AN{D1}DACLHR0900'],en:'NEUTRAL AVAILABILITY',bn:'ফ্লাইট ও খালি সিট দেখা। শেষে সময় (0900) দিলে সেই সময় থেকে দেখাবে।'},
+ {cat:'অ্যাভেইলেবিলিটি',code:'SN',fmt:'SN + DATE + FROM + TO',ex:['SN{D1}DACDXB'],en:'SCHEDULE',bn:'শুধু সময়সূচি (সিট সংখ্যা ছাড়া)।'},
+ {cat:'অ্যাভেইলেবিলিটি',code:'AC',fmt:'AC + DATE  |  AC/A + AIRLINE',ex:['AC{D2}','AC/AQR'],en:'CHANGE AVAILABILITY',bn:'শেষ অ্যাভেইলেবিলিটির তারিখ বা এয়ারলাইন বদলানো।'},
+ {cat:'অ্যাভেইলেবিলিটি',code:'ACR',fmt:'ACR + DATE',ex:['ACR{D3}'],en:'RETURN AVAILABILITY',bn:'একই রুটের ফেরার ফ্লাইট।'},
+ {cat:'অ্যাভেইলেবিলিটি',code:'MD',fmt:'MD / MU / MT / MB',ex:['MD','MU'],en:'MOVE DOWN/UP',bn:'অ্যাভেইলেবিলিটির পরের/আগের পেজ।'},
+ {cat:'সেল',code:'SS',fmt:'SS + SEATS + CLASS + LINE',ex:['SS1Y1','SS2M3','SS1YM2'],en:'SELL FROM AVAILABILITY',bn:'সিট বুক করা। কানেক্টিং লাইনে প্রতি সেগমেন্টে আলাদা ক্লাস দেওয়া যায় (SS1YM2)।'},
+ {cat:'সেল',code:'SSL',fmt:'SS + AL + FLT + CLASS + DATE + FROM + TO + SEATS',ex:['SS{AL}Y{D1}DACDXB1'],en:'LONG SELL',bn:'অ্যাভেইলেবিলিটি ছাড়াই সরাসরি ফ্লাইট নম্বর দিয়ে বুক।'},
+ {cat:'সেল',code:'SB',fmt:'SB + CLASS + SEGMENT',ex:['SBM2'],en:'REBOOK CLASS',bn:'বুক করা সেগমেন্টের ক্লাস পরিবর্তন।'},
+ {cat:'PNR এলিমেন্ট',code:'NM',fmt:'NM + COUNT + SURNAME/NAME TITLE',ex:['NM1KHAN/IQBAL MR','NM2KHAN/IQBAL MR/SALMA MRS','NM1KHAN/RAFI MSTR(CHD/12MAR18)','NM1KHAN/IQBAL MR(INFKHAN/ARIF/05JAN25)'],en:'NAME',bn:'যাত্রীর নাম। চাইল্ড (CHD/জন্মতারিখ), ইনফ্যান্ট অ্যাডাল্টের সাথে (INF...)।'},
+ {cat:'PNR এলিমেন্ট',code:'AP',fmt:'AP PHONE | APM-MOBILE | APE-EMAIL',ex:['AP DMM 0501234567','APM-+8801711000000','APE-IQBAL@MAIL.COM'],en:'CONTACT',bn:'যোগাযোগ (বাধ্যতামূলক)।'},
+ {cat:'PNR এলিমেন্ট',code:'TK',fmt:'TKOK | TKTL + DATE/TIME',ex:['TKOK','TKTL{D0}/1200'],en:'TICKETING ARRANGEMENT',bn:'টিকেটিং অ্যারেঞ্জমেন্ট (বাধ্যতামূলক)।'},
+ {cat:'PNR এলিমেন্ট',code:'RF',fmt:'RF + NAME',ex:['RFIQBAL','RF PAX BY PHONE'],en:'RECEIVED FROM',bn:'কে বুকিং/পরিবর্তন চেয়েছেন। প্রতিবার সেভের আগে লাগে।'},
+ {cat:'PNR এলিমেন্ট',code:'RM',fmt:'RM TEXT | RC TEXT',ex:['RM CUSTOMER PREFERS AISLE','RC CORPORATE DEAL'],en:'REMARK',bn:'সাধারণ (RM) বা গোপন (RC) রিমার্ক।'},
+ {cat:'PNR এলিমেন্ট',code:'OS',fmt:'OS + AIRLINE + TEXT',ex:['OS EK VIP PASSENGER','OS YY CTCP 0501234567'],en:'OTHER SERVICE INFO',bn:'এয়ারলাইনকে তথ্য জানানো (উত্তর লাগে না)।'},
+ {cat:'SSR ও সিট',code:'SR',fmt:'SR + CODE /P PAX /S SEG',ex:['SR MOML/P1','SR WCHR/P1','SR FQTV EK-EK123456789/P1'],en:'SPECIAL SERVICE REQUEST',bn:'স্পেশাল মিল, হুইলচেয়ার ইত্যাদি। মিল/হুইলচেয়ার সব সেগমেন্টে যায়।'},
+ {cat:'SSR ও সিট',code:'SRDOCS',fmt:'SRDOCS AL HK1-P-ISS-NUMBER-NAT-DOB-G-EXP-SUR-NAME/P1',ex:['SRDOCS {AL2} HK1-P-BGD-A12345678-BGD-15MAR90-M-20AUG31-KHAN-IQBAL/P1'],en:'PASSPORT DATA (APIS)',bn:'পাসপোর্ট তথ্য। দেশ ৩ অক্ষরে (BGD), তারিখ DDMMMYY।'},
+ {cat:'SSR ও সিট',code:'SM',fmt:'SM + SEGMENT',ex:['SM2'],en:'SEAT MAP',bn:'সিট ম্যাপ দেখা।'},
+ {cat:'SSR ও সিট',code:'ST',fmt:'ST/ROWSEAT/P PAX/S SEG',ex:['ST/23A/P1/S2'],en:'SEAT REQUEST',bn:'নির্দিষ্ট সিট নেওয়া।'},
+ {cat:'সেভ ও রিট্রিভ',code:'ET',fmt:'ET | ER',ex:['ET','ER'],en:'END TRANSACTION',bn:'ET সেভ করে স্ক্রিন খালি করে; ER সেভ করে আবার দেখায়।'},
+ {cat:'সেভ ও রিট্রিভ',code:'IG',fmt:'IG | IR',ex:['IG','IR'],en:'IGNORE',bn:'IG: সব পরিবর্তন বাতিল করে বন্ধ; IR: বাতিল করে সেভ করা অবস্থা দেখায়।'},
+ {cat:'সেভ ও রিট্রিভ',code:'RT',fmt:'RT | RT + LOCATOR | RT/SURNAME',ex:['RT','RT/KHAN'],en:'RETRIEVE PNR',bn:'PNR খোলা। RTN নাম, RTA ফ্লাইট।'},
+ {cat:'সেভ ও রিট্রিভ',code:'RH',fmt:'RH',ex:['RH'],en:'PNR HISTORY',bn:'কে কখন কী বদলেছে।'},
+ {cat:'সেভ ও রিট্রিভ',code:'XE',fmt:'XE + ELEMENT (XE3,5 / XE3-5)',ex:['XE4','XE3-5'],en:'CANCEL ELEMENT',bn:'এলিমেন্ট বাতিল।'},
+ {cat:'সেভ ও রিট্রিভ',code:'XI',fmt:'XI',ex:['XI'],en:'CANCEL ITINERARY',bn:'সব ফ্লাইট সেগমেন্ট বাতিল।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'FQD',fmt:'FQD + FROM + TO /A AIRLINE',ex:['FQDDACDXB/AEK'],en:'FARE DISPLAY',bn:'রুটের সব ভাড়ার তালিকা।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'FQN',fmt:'FQN + LINE',ex:['FQN1'],en:'FARE NOTES/RULES',bn:'ভাড়ার নিয়ম, পেনাল্টি, ব্যাগেজ।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'FXX',fmt:'FXX',ex:['FXX'],en:'INFORMATIVE PRICING',bn:'শুধু দাম দেখা, কিছু সেভ হয় না।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'FXP',fmt:'FXP (/P1)',ex:['FXP','FXP/P1'],en:'PRICE AND CREATE TST',bn:'দাম বের করে TST সেভ (টিকেটের জন্য বাধ্যতামূলক)।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'FXB',fmt:'FXB',ex:['FXB'],en:'BEST BUY - REBOOK',bn:'সবচেয়ে কম খোলা ক্লাসে রিবুক করে দাম।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'FXA',fmt:'FXA',ex:['FXA'],en:'LOWER FARE OPTIONS',bn:'কম ভাড়ার অপশন দেখায়, রিবুক করে না।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'TQT',fmt:'TQT (/T1)',ex:['TQT','TQT/T1'],en:'DISPLAY TST',bn:'সেভ করা TST দেখা।'},
+ {cat:'ভাড়া ও প্রাইসিং',code:'TTE',fmt:'TTE/ALL | TTE/T1',ex:['TTE/ALL'],en:'DELETE TST',bn:'TST মুছে ফেলা।'},
+ {cat:'টিকেটিং',code:'FP',fmt:'FPCASH | FPCHEQUE | FPCC..',ex:['FPCASH','FPCCVI4111111111111111/1229'],en:'FORM OF PAYMENT',bn:'পেমেন্ট পদ্ধতি। কার্ডে শুধু টেস্ট নম্বর।'},
+ {cat:'টিকেটিং',code:'FM',fmt:'FM + PERCENT',ex:['FM0','FM5'],en:'COMMISSION',bn:'এজেন্সি কমিশন।'},
+ {cat:'টিকেটিং',code:'FV',fmt:'FV + AIRLINE',ex:['FV{AL2}'],en:'VALIDATING CARRIER',bn:'কোন এয়ারলাইনের স্টকে টিকেট।'},
+ {cat:'টিকেটিং',code:'TTP',fmt:'TTP | TTP/RT',ex:['TTP/RT'],en:'ISSUE TICKET',bn:'ই-টিকেট ইস্যু। লাগবে: TST + FP + সেভ করা PNR।'},
+ {cat:'টিকেটিং',code:'TWD',fmt:'TWD | TWD/L + FA LINE',ex:['TWD'],en:'DISPLAY TICKET',bn:'টিকেট ইমেজ ও কুপন স্ট্যাটাস।'},
+ {cat:'টিকেটিং',code:'TWX',fmt:'TWX + FA LINE',ex:['TWX{FA}'],en:'VOID TICKET',bn:'একই দিনে টিকেট বাতিল।'},
+ {cat:'টিকেটিং',code:'TRF',fmt:'TRF + FA LINE',ex:['TRF{FA}'],en:'REFUND TICKET',bn:'রিফান্ড (পেনাল্টি কেটে)।'},
+ {cat:'কিউ',code:'QP',fmt:'QP/ + QUEUE',ex:['QP/8'],en:'QUEUE PLACE',bn:'PNR কিউতে রাখা।'},
+ {cat:'কিউ',code:'QT',fmt:'QT',ex:['QT'],en:'QUEUE COUNT',bn:'কোন কিউতে কয়টি PNR।'},
+ {cat:'কিউ',code:'QS',fmt:'QS + QUEUE | QN | QI',ex:['QS8','QN','QI'],en:'QUEUE START/NEXT/EXIT',bn:'কিউ খোলা, পরেরটি, বের হওয়া।'},
+ {cat:'অন্যান্য',code:'DO',fmt:'DO + SEGMENT',ex:['DO2'],en:'FLIGHT INFORMATION',bn:'বুক করা ফ্লাইটের সময়, এয়ারক্রাফট।'},
+ {cat:'অন্যান্য',code:'HE',fmt:'HE + CODE',ex:['HE','HE NM'],en:'HELP',bn:'হেল্প।'}
+];
+function fill(s){const p=P();const mp=numMap(p);const fa=p.els.find(e=>e.type==='FA');return s.replace(/\{D(\d)\}/g,(_,n)=>D([2,30,32,45][+n]||30)).replace('{FA}',fa?mp[fa.id]:'6').replace('{AL}',p.segs[0]?p.segs[0].al+p.segs[0].fn:'EK585').replace(/\{AL2\}/g,p.segs[0]?.al||'EK');}
+
+/* =================== LESSONS =================== */
+const LESSONS=[
+ {t:'সাইন ইন ও কোড চেনা',d:'যেকোনো কাজের আগে সাইন ইন। তারপর শহর ও এয়ারলাইনের কোড চেনা।',s:[['JI','সাইন ইন','JI1234AB/SU'],['DAC','শহর কোড ডিকোড','DACMED'],['DAN','নাম থেকে কোড','DANJEDDAH'],['DNA','এয়ারলাইন ডিকোড','DNASV'],['DD','লোকাল টাইম','DDLHR']]},
+ {t:'ফ্লাইট অ্যাভেইলেবিলিটি',d:'তারিখ + রুট দিয়ে ফ্লাইট খোঁজা, পেজ বদলানো, রিটার্ন দেখা।',s:[['AN','অ্যাভেইলেবিলিটি','AN{D1}DACDXB'],['ANA','এয়ারলাইন ফিল্টার','AN{D1}DMMJED/ASV'],['AC','তারিখ বদল','AC{D2}'],['MD','পরের পেজ','MD'],['ACR','রিটার্ন ফ্লাইট','ACR{D3}']]},
+ {t:'ওয়ান-ওয়ে PNR তৈরি',d:'বুকিংয়ের ৫টি বাধ্যতামূলক অংশ: ফ্লাইট, নাম, AP, TK, RF — তারপর সেভ।',s:[['AN','ফ্লাইট খুঁজুন','AN{D1}DMMDAC'],['SS','সিট সেল','SS1Y1'],['NM','যাত্রীর নাম','NM1KHAN/IQBAL MR'],['AP','ফোন নম্বর','AP DMM 0501234567'],['APE','ইমেইল','APE-IQBAL@MAIL.COM'],['TK','টিকেটিং অ্যারেঞ্জমেন্ট','TKOK'],['RF','রিসিভড ফ্রম','RFIQBAL'],['ER','সেভ ও রিডিসপ্লে','ER']]},
+ {t:'প্রাইসিং ও টিকেটিং',d:'সেভ করা PNR-এ দাম সেভ করে পেমেন্ট দিয়ে ই-টিকেট ইস্যু।',s:[['FXX','শুধু দাম দেখা','FXX'],['FXP','দাম ও TST সেভ','FXP'],['TQT','TST দেখা','TQT'],['FP','পেমেন্ট','FPCASH'],['FM','কমিশন','FM0'],['FV','ভ্যালিডেটিং ক্যারিয়ার','FV{AL2}'],['RF','রিসিভড ফ্রম','RFIQBAL'],['ER','সেভ','ER'],['TTP','টিকেট ইস্যু','TTP/RT'],['TWD','টিকেট দেখা','TWD']]},
+ {t:'SSR, পাসপোর্ট ও সিট',d:'আন্তর্জাতিক ফ্লাইটে পাসপোর্ট (DOCS) লাগে; মিল, হুইলচেয়ার, সিট।',s:[['DOCS','পাসপোর্ট','SRDOCS {AL2} HK1-P-BGD-A12345678-BGD-15MAR90-M-20AUG31-KHAN-IQBAL/P1'],['SR:MOML','মুসলিম মিল','SR MOML/P1'],['SR:WCHR','হুইলচেয়ার','SR WCHR/P1'],['OS','OSI','OS YY CTCP 0501234567'],['SM','সিট ম্যাপ','SM2'],['ST','সিট নেওয়া','ST/23A/P1/S2'],['RM','রিমার্ক','RM PAX PREFERS AISLE']]},
+ {t:'পরিবর্তন, বাতিল ও ভয়েড',d:'সেভ করা PNR খুলে বদলানো, ভুল হলে IG, টিকেট ভয়েড।',s:[['RT','নাম দিয়ে PNR খোলা','RT/KHAN'],['SB','ক্লাস বদল','SBM2'],['XE','এলিমেন্ট বাতিল','XE5'],['IG','পরিবর্তন বাদ','IR'],['RH','হিস্ট্রি','RH'],['TWX','টিকেট ভয়েড','TWX{FA}'],['XI','সব ফ্লাইট বাতিল','XI']]},
+ {t:'ফ্যামিলি রিটার্ন বুকিং',d:'অ্যাডাল্ট+ইনফ্যান্ট ও চাইল্ড নিয়ে যাওয়া-আসার বুকিং। ইনফ্যান্ট সিট নেয় না।',s:[['AN','যাওয়ার ফ্লাইট','AN{D1}DMMDAC'],['SS','২টি সিট','SS2Y1'],['ACR','ফেরার ফ্লাইট','ACR{D3}'],['SS2','ফেরায় ২টি সিট','SS2Y1'],['NM_INF','অ্যাডাল্ট + ইনফ্যান্ট','NM1KHAN/IQBAL MR(INFKHAN/ARIF/05JAN25)'],['NM_CHD','চাইল্ড','NM1KHAN/RAFI MSTR(CHD/12MAR18)'],['FXP','মাল্টি-প্যাক্স প্রাইস','FXP']]},
+ {t:'কিউ ও ফেয়ার রুলস',d:'ফেয়ার নিয়ম পড়া আর PNR কিউতে পাঠানো।',s:[['FQD','ভাড়ার তালিকা','FQDDACDXB/AEK'],['FQN','নিয়ম পড়া','FQN1'],['QP','কিউতে রাখা','QP/8'],['QT','কিউ কাউন্ট','QT'],['QS','কিউ খোলা','QS8']]}
+];
+
+/* =================== UNKNOWN / FUZZY =================== */
+const KNOWN=['JI','JO','JD','DAC','DAN','DNA','DNE','DD','DO','AN','AD','SN','TN','AC','ACR','MD','MU','SS','SB','NM','AP','APE','APM','TK','TKOK','TKTL','RF','RM','RC','OS','SR','SRDOCS','SM','ST','ET','ER','IG','IR','RT','RH','XE','XI','FQD','FQN','FXX','FXP','FXB','FXA','TQT','TTE','FP','FPCASH','FM','FV','TTP','TWD','TWX','TRF','QP','QT','QS','QN','QI','HE'];
+const ALIAS={NA:'NM',NAME:'NM',NN:'NM',SEL:'SS',SELL:'SS',AV:'AN',AVAIL:'AN',A:'AN',PNR:'RT',SAVE:'ET',END:'ET',PRICE:'FXP',TKT:'TTP',TICKET:'TTP',PHONE:'AP',PH:'AP',EMAIL:'APE',CASH:'FPCASH',SIGN:'JI',LOGIN:'JI',LOGOUT:'JO',HELP:'HE',CANCEL:'XE',DEL:'XE',VOID:'TWX',REFUND:'TRF',SEAT:'SM',DOCS:'SRDOCS',PASSPORT:'SRDOCS',FX:'FXP',FQ:'FQD',TQ:'TQT',RFX:'RF'};
+function unknown(cs){
+  const head=(/^[A-Z]+/.exec(cs)||[''])[0];
+  let cands=[];
+  for(let L=Math.min(6,head.length);L>=1;L--){const h=head.slice(0,L);if(ALIAS[h]){cands.push(ALIAS[h]);break;}}
+  const scored=KNOWN.map(k=>[k,lev(head.slice(0,k.length+1),k)-(head.startsWith(k.slice(0,2))?0.6:0)]).sort((a,b)=>a[1]-b[1]);
+  scored.filter(x=>x[1]<=1.5).slice(0,4).forEach(x=>{if(!cands.includes(x[0]))cands.push(x[0]);});
+  cands=cands.slice(0,3);
+  const ex=cands.map(k=>{const c=CMDS.find(x=>x.code===k)||CMDS.find(x=>x.code.startsWith(k.slice(0,2)));return c?fill(c.ex[0]):k;});
+  const desc=cands.map(k=>{const c=CMDS.find(x=>x.code===k)||CMDS.find(x=>x.code.startsWith(k.slice(0,2)));return c?`<b>${k}</b> = ${c.bn}`:k;}).join('<br>');
+  err('TRANSACTION CODE NOT SUPPORTED',cands.length?`"${esc(cs)}" কোনো Amadeus কমান্ড নয়। আপনি সম্ভবত এটা বোঝাতে চেয়েছেন:<div style="margin-top:4px">${desc}</div>`:`"${esc(cs)}" চেনা যায়নি। পুরো তালিকা দেখতে HE দিন বা ডানের "কমান্ড তালিকা" দেখুন।`,cands.length?ex:['HE']);
+}
+
+/* =================== DISPATCH =================== */
+const TABLE=[
+ [/^JO$/,cmdJO],[/^JD$/,cmdJD],[/^DAC/,cmdDAC],[/^DAN/,cmdDAN],[/^DNA/,cmdDNA],[/^DNE/,cmdDNE],[/^DD/,cmdDD],[/^DO\d*$/,cmdDO],
+ [/^(AN|AD|SN|TN)/,cmdAN],[/^AC/,cmdAC],[/^(MD|MU|MT|MB)$/,cmdMove],[/^SS/,cmdSS],[/^SB/,cmdSB],
+ [/^NM/,cmdNM],[/^AP/,cmdAP],[/^TK/,cmdTK],[/^RF/,cmdRF],[/^R[MC]/,cmdRM],[/^OS/,cmdOS],[/^SR/,cmdSR],[/^SM/,cmdSM],[/^ST/,cmdST],
+ [/^E[TR]K?$/,cmdET],[/^IG$/,cmdIG],[/^IR$/,cmdIR],[/^RH$/,cmdRH],[/^RT/,cmdRT],[/^XE/,cmdXE],[/^XI$/,cmdXI],
+ [/^FQD/,cmdFQD],[/^FQN/,cmdFQN],[/^FX/,cmdFX],[/^TQT/,cmdTQT],[/^TTE/,cmdTTE],[/^FP/,cmdFP],[/^FM/,cmdFM],[/^FV/,cmdFV],
+ [/^TTP/,cmdTTP],[/^TWD/,cmdTWD],[/^TWX/,cmdTWX],[/^TRF/,cmdTRF],[/^QP/,cmdQP],[/^QT$/,cmdQT],[/^QS/,cmdQS],[/^QN$/,cmdQN],[/^QI$/,cmdQI]
+];
+function run(raw){
+  const c=raw.toUpperCase().replace(/\s+/g,' ').trim();if(!c)return;
+  lastCmd=c;state.hist.push(c);if(state.hist.length>150)state.hist.shift();hidx=-1;
+  newBlock(c);const cs=c.replace(/ /g,'');
+  try{
+    if(/^(HE|HELP|\?)/.test(cs))cmdHE(cs);
+    else if(/^JI/.test(cs))cmdJI(cs);
+    else if(!state.signed){
+      const known=TABLE.some(([re])=>re.test(cs));
+      err('NOT SIGNED IN',`সাইন ইন ছাড়া কোনো এন্ট্রি কাজ করবে না।${known?'':' (তাছাড়া "'+esc(c)+'" কোনো চেনা কমান্ডও নয়।)'} প্রথমে JI দিয়ে সাইন ইন করুন।`,['JI1234AB/SU']);
+    } else {
+      const hit=TABLE.find(([re])=>re.test(cs));if(hit)hit[1](cs,c);else unknown(cs);
+    }
+  }catch(e){console.error(e);out('SYSTEM ERROR - TRY AGAIN','err');}
+  persist();refresh();
+  const s=$('#screen');s.scrollTop=s.scrollHeight;
+}
+
+/* =================== UI =================== */
+function coachNext(){
+  const p=P();
+  if(!state.signed)return['সাইন ইন করুন','JI1234AB/SU'];
+  if(state.qcur!=null)return['কিউ মোড চালু। পরের PNR: QN, বের হতে: QI','QN'];
+  if(!p.segs.length&&!p.names.length&&!p.loc){if(state.avail)return['লাইন বেছে সিট সেল করুন','SS1Y1'];return['ফ্লাইট খুঁজুন','AN'+D(30)+'DMMDAC'];}
+  if(!p.segs.length)return state.avail?['সিট সেল করুন','SS'+Math.max(1,p.names.length)+'Y1']:['ফ্লাইট খুঁজুন','AN'+D(30)+'DMMDAC'];
+  if(!p.names.length)return['যাত্রীর নাম দিন','NM'+p.segs[0].n+(p.segs[0].n===1?'KHAN/IQBAL MR':'KHAN/IQBAL MR/SALMA MRS')];
+  if(p.names.length!==p.segs[0].n)return[`যাত্রী ${p.names.length} জন কিন্তু সিট ${p.segs[0].n}টি — মিলিয়ে নিন`,'RT'];
+  if(!p.els.some(e=>e.type==='AP'))return['যোগাযোগ নম্বর দিন','AP DMM 0501234567'];
+  if(!p.els.some(e=>e.type==='TK'))return['টিকেটিং অ্যারেঞ্জমেন্ট দিন','TKOK'];
+  if(!p.loc)return p.rf?['PNR সেভ করুন','ER']:['রিসিভড ফ্রম দিন','RF'+(state.agent.slice(4)||'IQBAL')];
+  if(!p.tst.length)return['দাম বের করে TST সেভ করুন','FXP'];
+  if(!p.els.some(e=>e.type==='FP'))return['পেমেন্ট দিন','FPCASH'];
+  if(p.tst.some(t=>!t.ticketed)){if(p.dirty)return p.rf?['সেভ করুন, তারপর টিকেট','ER']:['রিসিভড ফ্রম দিন','RF'+(state.agent.slice(4)||'IQBAL')];return['টিকেট ইস্যু করুন','TTP/RT'];}
+  if(p.dirty)return p.rf?['পরিবর্তন সেভ করুন','ER']:['পরিবর্তনের পরে RF দিন','RF'+(state.agent.slice(4)||'IQBAL')];
+  return['টিকেট সম্পন্ন। টিকেট দেখুন বা নতুন বুকিং শুরু করুন (IG)','TWD'];
+}
+function refresh(){
+  const p=P();
+  $('#sSine').textContent=state.signed?state.agent.slice(4)+'/SU':'--/--';$('#sDot').classList.toggle('on',state.signed);
+  $('#sPnr').textContent=p.loc?(p.loc+(p.dirty?' *':'')):(hasContent(p)?'NEW *':'NONE');
+  const [txt,cmd]=coachNext();
+  $('#coach').innerHTML=`<span style="font-weight:600">পরবর্তী ধাপ:</span><span>${esc(txt)}</span><button type="button" class="ex" data-cmd="${esc(cmd)}">${esc(cmd)}</button>`;
+  $('#pnrLive').textContent=renderPNR(p);
+  const saved=Object.values(state.db);
+  $('#pnrSaved').innerHTML=saved.length?saved.slice().reverse().map(x=>{const n=x.names[0];const s=x.segs[0];const tk=x.tickets.some(t=>t.status==='OK');return `<button type="button" class="ex" data-cmd="RT${x.loc}" style="text-align:left;display:flex;justify-content:space-between;gap:10px;margin:0"><span>${x.loc}  ${esc(n?n.sur+'/'+n.given:'')}</span><span style="color:var(--muted)">${s?s.from+s.to+' '+ddmmm(s.date):''}${tk?' · TKT':''}</span></button>`;}).join(''):'<div class="bn" style="color:var(--muted);font-size:13px">এখনো কোনো PNR সেভ হয়নি। ET/ER দিলে এখানে দেখাবে।</div>';
+  const ms=state.mistakes;$('#errCount').textContent=ms.length?`(${ms.length})`:'';
+  $('#errList').innerHTML=ms.length?ms.slice(0,30).map(m=>`<div style="background:var(--sheet);border:1px solid var(--line);border-radius:4px;padding:8px 10px"><div class="mono" style="font-size:12px;color:var(--err)">&gt;${esc(m.cmd)}  ·  ${esc(m.msg)}</div><div style="font-size:13px;margin-top:3px;line-height:1.5">${m.bn}</div>${m.fix?`<div style="margin-top:4px">${exBtns([m.fix])}</div>`:''}</div>`).join(''):'<div style="color:var(--muted);font-size:13px">এখনো কোনো ভুল নেই।</div>';
+  renderLessons();
+}
+let openLesson=0;
+function renderLessons(){
+  const ev=new Set(state.events);
+  $('#lessons').innerHTML=LESSONS.map((l,i)=>{const done=l.s.filter(s=>ev.has(s[0])).length;const all=done===l.s.length;
+    return `<details class="lesson" data-i="${i}" ${openLesson===i?'open':''} style="background:var(--sheet);border:1px solid var(--line);border-radius:4px">
+      <summary style="padding:10px 12px;display:flex;align-items:center;gap:10px"><span class="mono" style="font-size:12px;color:${all?'var(--ok)':'var(--muted)'};min-width:34px">${done}/${l.s.length}</span><span style="font-weight:600;font-size:14.5px;flex:1">${i+1}. ${l.t}</span><span style="font-size:12px;color:var(--muted)">${openLesson===i?'−':'+'}</span></summary>
+      <div style="padding:0 12px 10px"><p style="font-size:13px;color:var(--muted);margin:0 0 4px;line-height:1.55">${l.d}</p>
+      ${l.s.map(s=>`<div class="step"><span class="tick ${ev.has(s[0])?'done':''}">${ev.has(s[0])?'✓':''}</span><div style="min-width:0"><div style="font-size:13.5px">${s[1]}</div>${exBtns([fill(s[2])])}</div></div>`).join('')}</div></details>`;}).join('');
+}
+function renderCmds(q){
+  q=(q||'').toUpperCase().trim();const cats=[...new Set(CMDS.map(c=>c.cat))];
+  $('#cmdList').innerHTML=cats.map(cat=>{const list=CMDS.filter(c=>c.cat===cat&&(!q||c.code.includes(q)||c.en.includes(q)||c.bn.toUpperCase().includes(q)||cat.includes(q)||c.ex.join(' ').includes(q)));if(!list.length)return'';
+    return `<div><div class="bn" style="font-weight:600;font-size:13px;color:var(--muted);letter-spacing:.02em;margin-bottom:6px">${cat}</div><div style="display:flex;flex-direction:column;gap:6px">${list.map(c=>`<div style="background:var(--sheet);border:1px solid var(--line);border-radius:4px;padding:8px 10px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span class="mono" style="font-weight:600;color:var(--entry)">${c.code}</span><span class="mono" style="font-size:11px;color:var(--muted);text-align:right">${c.en}</span></div><div class="mono" style="font-size:11.5px;color:var(--muted);margin:2px 0 3px;overflow-wrap:anywhere">${esc(c.fmt)}</div><div class="bn" style="font-size:13px;line-height:1.5">${c.bn}</div><div style="margin-top:4px;overflow-wrap:anywhere">${exBtns(c.ex.map(fill))}</div></div>`).join('')}</div></div>`;}).join('')||'<div class="bn" style="color:var(--muted)">কিছু পাওয়া যায়নি।</div>';
+}
+const CHIPS=[['JI','JI1234AB/SU'],['AN','AN{D1}DMMDAC'],['SS','SS1Y1'],['NM','NM1KHAN/IQBAL MR'],['AP','AP DMM 0501234567'],['TKOK','TKOK'],['RF','RFIQBAL'],['ER','ER'],['RT','RT'],['FXP','FXP'],['FPCASH','FPCASH'],['TTP','TTP/RT'],['XE','XE'],['IG','IG'],['HE','HE']];
+function insert(cmd){const i=$('#cmd');i.value=cmd;i.focus();try{i.setSelectionRange(cmd.length,cmd.length);}catch(e){}}
+
+function init(){
+  restore();
+  document.documentElement.style.setProperty('--fs',state.fs+'px');
+  $('#chips').innerHTML=CHIPS.map(([l,c])=>`<button type="button" class="chip" data-cmd="${esc(c)}" title="${esc(c)}">${esc(l)}</button>`).join('');
+  newBlock(null);
+  out(`AMADEUS PRACTICE TERMINAL - TRAINING MODE\nOFFICE ${OFFICE}   WORK AREA A   ${ddmmmyy(today())} ${utcNow()}Z\n${state.signed?'SIGNED IN - '+state.agent.slice(4)+'/SU':'NOT SIGNED - USE JI ENTRY (EXAMPLE JI1234AB/SU)'}\nHE FOR HELP`);
+  if(!state.signed)tip('শুরু করতে নিচে <b>JI1234AB/SU</b> লিখে Enter চাপুন। ডানে ধাপে ধাপে লেসন আছে; সাজেশনের কমান্ডে ক্লিক করলে ইনপুটে বসে যাবে।',['JI1234AB/SU']);
+  else if(hasContent(P())){out('ACTIVE PNR RESTORED');showPNR();}
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-cmd]');if(b){e.preventDefault();insert(b.dataset.cmd);}});
+  $('#cmdform').addEventListener('submit',e=>{e.preventDefault();const v=$('#cmd').value;$('#cmd').value='';run(v);});
+  $('#cmd').addEventListener('keydown',e=>{const h=state.hist;
+    if(e.key==='ArrowUp'){if(!h.length)return;e.preventDefault();hidx=hidx<0?h.length-1:Math.max(0,hidx-1);insert(h[hidx]);}
+    else if(e.key==='ArrowDown'){if(hidx<0)return;e.preventDefault();hidx++;if(hidx>=h.length){hidx=-1;insert('');}else insert(h[hidx]);}
+    else if(e.key==='Escape'){e.preventDefault();$('#cmd').value='';hidx=-1;}});
+  $('#clrBtn').onclick=()=>{$('#screen').innerHTML='';newBlock(null);out('SCREEN CLEARED');$('#cmd').focus();};
+  const setFs=d=>{state.fs=Math.min(17,Math.max(11,state.fs+d));document.documentElement.style.setProperty('--fs',state.fs+'px');persist();};
+  $('#fsUp').onclick=()=>setFs(0.5);$('#fsDown').onclick=()=>setFs(-0.5);
+  document.querySelectorAll('[role=tab]').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('[role=tab]').forEach(x=>x.setAttribute('aria-selected',x===t));document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==t.dataset.tab);}));
+  $('#lessons').addEventListener('toggle',e=>{const d=e.target;if(d.tagName!=='DETAILS')return;const i=+d.dataset.i;if(d.open)openLesson=i;else if(openLesson===i)openLesson=-1;},true);
+  $('#cmdSearch').addEventListener('input',e=>renderCmds(e.target.value));
+  $('#resetLessons').onclick=()=>{state.events=[];persist();refresh();};
+  $('#resetAll').onclick=()=>{$('#resetConfirm').hidden=false;};
+  $('#resetNo').onclick=()=>{$('#resetConfirm').hidden=true;};
+  $('#resetYes').onclick=()=>{try{localStorage.removeItem(KEY);}catch(e){}state={signed:false,agent:'',pnr:newPnr(),db:{},avail:null,mistakes:[],events:[],queues:{},qcur:null,rtList:null,hist:[],fs:13.5};$('#resetConfirm').hidden=true;$('#screen').innerHTML='';newBlock(null);out('ALL PRACTICE DATA CLEARED - SIGN IN WITH JI');refresh();};
+  renderCmds('');refresh();
+  if(window.matchMedia('(min-width:1024px)').matches)$('#cmd').focus();
+}
+window.__sim={run,state:()=>state};
+init();
+</script>
+
+</body>
+</html>
