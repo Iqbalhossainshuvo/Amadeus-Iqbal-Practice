@@ -1,7 +1,7 @@
 # Amadeus Practice Terminal
 
 Amadeus cryptic command প্র্যাকটিসের জন্য একটি অনানুষ্ঠানিক সিমুলেটর। শুধু HTML, JavaScript আর Tailwind দিয়ে তৈরি, একটি ফাইলেই পুরোটা।
-
+লাইভ:https://iqbalhossainshuvo.github.io/Amadeus-Iqbal-Practice/
 ## চালানোর নিয়ম
 
 `index.html` ফাইলটি ব্রাউজারে খুলুন। শুরু করতে `JI1234AB/SU` দিন।
